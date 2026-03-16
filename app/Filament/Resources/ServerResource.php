@@ -78,7 +78,7 @@ class ServerResource extends Resource
             <li>Accedi al pannello ISPConfig come admin</li>
             <li>Vai su <strong>System → Remote Users</strong></li>
             <li>Crea un nuovo utente remoto con i permessi: <em>Sites, Server, Client</em></li>
-            <li>L\'URL API sarà: <span class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1 rounded">https://tuoserver:8080/remote/index.php</span></li>
+            <li>L\'URL da inserire è solo il base: <span class="font-mono text-xs bg-gray-100 dark:bg-gray-800 px-1 rounded">https://tuoserver:8080</span></li>
         </ol>
         <p class="mt-2 text-xs italic">Se ISPConfig usa una porta diversa dalla 8080, adatta l\'URL di conseguenza.</p>
     </div>
@@ -153,9 +153,9 @@ class ServerResource extends Resource
             Forms\Components\Section::make('ISPConfig API')
                 ->schema([
                     Forms\Components\TextInput::make('ispconfig_api_url')
-                        ->label('URL API ISPConfig')
-                        ->placeholder('https://127.0.0.1:8080/remote/index.php')
-                        ->helperText('Endpoint SOAP di ISPConfig. Attenzione: il percorso corretto è /remote/index.php — non /remote/json.php.')
+                        ->label('URL ISPConfig')
+                        ->placeholder('https://127.0.0.1:8080')
+                        ->helperText('Inserisci solo il base URL (es. https://127.0.0.1:8080). Il percorso /remote/json.php viene aggiunto automaticamente.')
                         ->required()
                         ->columnSpanFull(),
 
