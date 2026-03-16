@@ -168,8 +168,8 @@ class ServerResource extends Resource
                         ->label('Password API ISPConfig')
                         ->password()
                         ->revealable()
-                        ->helperText('Salvata cifrata nel database.')
-                        ->required()
+                        ->helperText('Lascia vuoto per mantenere la password attuale.')
+                        ->required(fn (string $operation) => $operation === 'create')
                         ->dehydrated(fn ($state) => filled($state)),
 
                 ])->columns(2),
