@@ -87,9 +87,21 @@ class IspConfigService
         ]);
 
         $clients = $response['response'] ?? [];
-        $count   = 0;
+
+        // ISPConfig può restituire false o "" se non ci sono clienti
+        if (! is_array($clients)) {
+            Log::info("IspConfigService::syncClients — nessun cliente trovato (response: " . json_encode($clients) . ")");
+            return 0;
+        }
+
+        $count = 0;
 
         foreach ($clients as $client) {
+            // Salta se il record non è un array (protezione extra)
+            if (! is_array($client)) {
+                continue;
+            }
+
             IspConfigClient::updateOrCreate(
                 [
                     'server_id'           => $this->server->id,
@@ -113,17 +125,8 @@ class IspConfigService
     {
         $this->connect();
 
-        // ISPConfig espone le versioni PHP tramite server_get
-        $response = $this->post('server_get_all', [
-            'session_id' => $this->sessionId,
-        ]);
-
-        $servers  = $response['response'] ?? [];
-        $count    = 0;
-
-        // Le versioni PHP disponibili sono nelle impostazioni del server
-        // Utilizziamo le versioni standard installate sul sistema
         $phpVersions = $this->detectPhpVersions();
+        $count       = 0;
 
         foreach ($phpVersions as $version) {
             IspConfigPhpVersion::updateOrCreate(
@@ -137,6 +140,19 @@ class IspConfigService
                 ]
             );
             $count++;
+        }
+
+        // Se non ne trovate nessuna, inserisci almeno la versione di default
+        if ($count === 0) {
+            $defaultVersion = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
+            IspConfigPhpVersion::updateOrCreate(
+                ['server_id' => $this->server->id, 'version' => $defaultVersion],
+                [
+                    'label'           => "PHP {$defaultVersion} (FPM)",
+                    'fpm_config_path' => "/etc/php/{$defaultVersion}/fpm/php.ini",
+                ]
+            );
+            $count = 1;
         }
 
         return $count;
