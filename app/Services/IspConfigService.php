@@ -61,8 +61,18 @@ class IspConfigService
     }
 
     /**
-     * Recupera tutti i clienti da ISPConfig e li sincronizza nel DB locale.
+     * Testa la connessione e le credenziali ISPConfig.
+     * Restituisce true se il login riesce, lancia eccezione altrimenti.
      */
+    public function testConnection(): bool
+    {
+        $this->connect();
+        // Se connect() non lancia eccezione, le credenziali sono valide
+        $this->disconnect();
+        return true;
+    }
+
+
     public function syncClients(): int
     {
         $this->connect();

@@ -226,13 +226,39 @@ class ServerResource extends Resource
                     ->icon('heroicon-o-signal')
                     ->color('warning')
                     ->action(function (Server $record) {
-                        $ok = $record->connection()->test();
+                        $results = [];
+                        $allOk   = true;
+
+                        // Test 1 — connessione shell (locale o SSH)
+                        $shellOk = $record->connection()->test();
+                        $results[] = ($shellOk ? '✅' : '❌') . ' Connessione shell: ' .
+                            ($shellOk ? 'OK' : 'FALLITA — verifica IP e tipo connessione');
+                        if (! $shellOk) $allOk = false;
+
+                        // Test 2 — credenziali ISPConfig SOAP
+                        try {
+                            $ispConfig = new \App\Services\IspConfigService($record);
+                            $ispConfig->testConnection();
+                            $results[] = '✅ Credenziali ISPConfig: OK';
+                        } catch (\Throwable $e) {
+                            $results[] = '❌ Credenziali ISPConfig: FALLITE — ' . $e->getMessage();
+                            $allOk = false;
+                        }
+
+                        // Test 3 — WP-CLI disponibile
+                        try {
+                            $record->connection()->run('wp --info --allow-root 2>&1 | head -1');
+                            $results[] = '✅ WP-CLI: trovato';
+                        } catch (\Throwable) {
+                            $results[] = '⚠️ WP-CLI: non trovato (necessario per il provisioning)';
+                            // Non blocca — warning ma non fallimento critico
+                        }
+
                         Notification::make()
-                            ->title($ok ? '✅ Connessione OK' : '❌ Connessione fallita')
-                            ->body($ok
-                                ? 'Il server risponde correttamente.'
-                                : 'Impossibile connettersi. Verifica IP, tipo connessione e credenziali.')
-                            ->status($ok ? 'success' : 'danger')
+                            ->title($allOk ? 'Tutti i test superati' : 'Alcuni test falliti')
+                            ->body(implode("\n", $results))
+                            ->status($allOk ? 'success' : 'danger')
+                            ->persistent(! $allOk)
                             ->send();
                     }),
                 Tables\Actions\EditAction::make(),
