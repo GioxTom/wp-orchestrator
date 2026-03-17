@@ -16,19 +16,41 @@ class DeployMuPluginJob extends BaseProvisioningJob
         $muPluginDir  = "{$docroot}/wp-content/mu-plugins";
         $muPluginDest = "{$muPluginDir}/orchestrator-governance.php";
 
-        // Crea la directory mu-plugins se non esiste
-        $connection->run("mkdir -p {$muPluginDir}");
+        // Rileva l'utente proprietario del docroot
+        $owner = $this->getDocRootOwner($docroot);
+        $sudo  = $owner ? "sudo -u {$owner}" : "sudo";
 
-        // Genera il contenuto del MU-plugin con l'email canonico del sito
+        // Crea la directory mu-plugins se non esiste
+        $connection->run("{$sudo} mkdir -p {$muPluginDir}");
+
+        // Genera il contenuto del MU-plugin
         $muPluginContent = $this->generateMuPlugin($site->wp_admin_email);
 
-        // Scrive il file direttamente (locale) o via upload (SSH)
-        $tmpPath = tempnam(sys_get_temp_dir(), 'mu_plugin_');
+        // Scrive il file in /tmp (accessibile da tutti) poi lo copia con sudo
+        $tmpPath = '/tmp/mu_plugin_' . uniqid() . '.php';
         file_put_contents($tmpPath, $muPluginContent);
+        chmod($tmpPath, 0644);
 
-        $connection->upload($tmpPath, $muPluginDest);
+        $connection->run("{$sudo} cp " . escapeshellarg($tmpPath) . " " . escapeshellarg($muPluginDest));
+        $connection->run("{$sudo} chmod 644 " . escapeshellarg($muPluginDest));
 
         @unlink($tmpPath);
+    }
+
+    private function getDocRootOwner(string $docroot): ?string
+    {
+        // Legge il proprietario da cgi-bin che è drwxr-xr-x (accessibile da tutti)
+        $parent = dirname($docroot);
+        foreach (['cgi-bin', 'tmp'] as $sub) {
+            $stat = @stat($parent . '/' . $sub);
+            if ($stat) {
+                $info = posix_getpwuid($stat['uid']);
+                if ($info && $info['name'] !== 'root') {
+                    return $info['name'];
+                }
+            }
+        }
+        return null;
     }
 
     private function generateMuPlugin(string $canonicalEmail): string
