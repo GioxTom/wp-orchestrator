@@ -219,7 +219,7 @@ class IspConfigService
             'primary_id' => $domainId,
         ]);
 
-        $domain  = $response['response'] ?? [];
+        $domain = $response['response'] ?? [];
 
         // Usa document_root se presente e valido
         $webRoot = $domain['document_root'] ?? null;
@@ -227,24 +227,16 @@ class IspConfigService
             return rtrim($webRoot, '/');
         }
 
-        // Fallback: costruisci il path standard ISPConfig
-        // /var/www/clients/client{client_id}/web{domain_id}/web
-        $clientId = $domain['client_id']
-            ?? $domain['sys_userid']
-            ?? null;
-
-        if ($clientId) {
-            return "/var/www/clients/client{$clientId}/web{$domainId}/web";
-        }
-
-        // Fallback finale: cerca fisicamente sul filesystem
+        // Cerca fisicamente sul filesystem con /web finale
         foreach (glob("/var/www/clients/client*/web{$domainId}/web") ?: [] as $path) {
             if (is_dir($path)) {
                 return $path;
             }
         }
 
-        return "/var/www/clients/client1/web{$domainId}/web";
+        // Fallback con client_id
+        $clientId = $domain['client_id'] ?? $domain['sys_userid'] ?? 1;
+        return "/var/www/clients/client{$clientId}/web{$domainId}/web";
     }
 
     public function createWebDomain(array $params): int
