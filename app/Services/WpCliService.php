@@ -12,12 +12,39 @@ class WpCliService
 
     /**
      * Esegue un comando WP-CLI nel docroot specificato.
+     * Usa sudo per operare con i permessi corretti sul docroot.
      */
     public function run(string $docroot, string $command): string
     {
-        // --allow-root necessario se il worker gira come root (non consigliato ma comune)
-        $cmd = "wp --path={$docroot} {$command} --allow-root 2>&1";
+        // Rileva l'utente proprietario del docroot
+        $owner = $this->getDocRootOwner($docroot);
+
+        if ($owner && $owner !== posix_getpwuid(posix_geteuid())['name']) {
+            // Esegui come proprietario del docroot
+            $cmd = "sudo -u {$owner} wp --path={$docroot} {$command} 2>&1";
+        } else {
+            $cmd = "wp --path={$docroot} {$command} --allow-root 2>&1";
+        }
+
         return $this->connection->run($cmd);
+    }
+
+    /**
+     * Restituisce l'utente proprietario del docroot.
+     */
+    private function getDocRootOwner(string $docroot): ?string
+    {
+        if (! is_dir($docroot)) {
+            return null;
+        }
+
+        $stat = stat($docroot);
+        if (! $stat) {
+            return null;
+        }
+
+        $info = posix_getpwuid($stat['uid']);
+        return $info['name'] ?? null;
     }
 
     /**
