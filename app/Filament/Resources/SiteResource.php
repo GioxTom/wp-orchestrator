@@ -240,35 +240,33 @@ class SiteResource extends Resource
                     ->visible(fn (Site $record) => $record->status === 'error')
                     ->requiresConfirmation()
                     ->modalHeading('Riprendere il provisioning?')
-                    ->modalDescription('Il provisioning ripartirà dall\'inizio. Assicurati di aver corretto il problema prima di riprovare.')
+                    ->modalDescription(fn (Site $record) => 'Ripartirà dallo step fallito: ' .
+                        ($record->provisioningLogs()->where('status', 'failed')->latest()->first()?->step_label ?? 'inizio'))
                     ->modalSubmitActionLabel('Sì, riprova')
                     ->action(function (Site $record) {
-                        // Pulisce i log falliti precedenti
-                        $record->provisioningLogs()->delete();
+                        // Trova l'ultimo job fallito
+                        $lastFailed = $record->provisioningLogs()
+                            ->where('status', 'failed')
+                            ->latest()
+                            ->first();
 
-                        // Reset stato — preserva docroot e credenziali DB se già create
-                        $resetData = [
-                            'status'              => 'provisioning',
-                            'current_step'        => null,
-                            'ispconfig_domain_id' => null,
-                            'wp_admin_password'   => null,
-                        ];
+                        // Elimina solo il log fallito per permettere il retry
+                        $lastFailed?->delete();
 
-                        // Reset DB solo se non è stato ancora creato correttamente
-                        if (! $record->ispconfig_db_id) {
-                            $resetData['db_name']        = null;
-                            $resetData['db_user']        = null;
-                            $resetData['db_password']    = null;
-                            $resetData['ispconfig_db_id'] = null;
-                        }
+                        // Riparte dal job fallito, non dall'inizio
+                        $jobClass = $lastFailed?->job_class
+                            ?? \App\Jobs\Provisioning\CreateIspConfigDomainJob::class;
 
-                        $record->update($resetData);
+                        $record->update([
+                            'status'       => 'provisioning',
+                            'current_step' => null,
+                        ]);
 
-                        dispatch(new \App\Jobs\Provisioning\CreateIspConfigDomainJob($record));
+                        dispatch(new $jobClass($record->fresh()));
 
                         Notification::make()
-                            ->title('Provisioning riavviato')
-                            ->body('Il sito verrà ricreato dall\'inizio.')
+                            ->title('Provisioning ripreso')
+                            ->body('Ripartito da: ' . ($lastFailed?->step_label ?? 'inizio'))
                             ->success()
                             ->send();
                     }),
