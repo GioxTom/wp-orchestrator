@@ -216,19 +216,35 @@ class IspConfigService
 
         $response = $this->post('sites_web_domain_get', [
             'session_id' => $this->sessionId,
-            'domain_id'  => $domainId,
+            'primary_id' => $domainId,
         ]);
 
         $domain  = $response['response'] ?? [];
-        $webRoot = $domain['document_root'] ?? null;
 
+        // Usa document_root se presente e valido
+        $webRoot = $domain['document_root'] ?? null;
         if ($webRoot && is_dir($webRoot)) {
             return rtrim($webRoot, '/');
         }
 
-        // Fallback standard ISPConfig path
-        // /var/www/clients/client{N}/web{N}/web
-        return "/var/www/clients/client{$domain['sys_userid']}/web{$domainId}/web";
+        // Fallback: costruisci il path standard ISPConfig
+        // /var/www/clients/client{client_id}/web{domain_id}/web
+        $clientId = $domain['client_id']
+            ?? $domain['sys_userid']
+            ?? null;
+
+        if ($clientId) {
+            return "/var/www/clients/client{$clientId}/web{$domainId}/web";
+        }
+
+        // Fallback finale: cerca fisicamente sul filesystem
+        foreach (glob("/var/www/clients/client*/web{$domainId}/web") ?: [] as $path) {
+            if (is_dir($path)) {
+                return $path;
+            }
+        }
+
+        return "/var/www/clients/client1/web{$domainId}/web";
     }
 
     public function createWebDomain(array $params): int
