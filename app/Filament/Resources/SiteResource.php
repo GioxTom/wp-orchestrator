@@ -52,6 +52,9 @@ class SiteResource extends Resource
                         ->options(fn ($get) => IspConfigClient::where('server_id', $get('server_id'))
                             ->get()
                             ->pluck('display_name', 'id'))
+                        ->default(fn ($get) => IspConfigClient::getDefault(
+                            $get('server_id') ?? \App\Models\Server::where('status', 'active')->value('id')
+                        )?->id)
                         ->required()
                         ->searchable()
                         ->disabled(fn ($get) => ! $get('server_id')),

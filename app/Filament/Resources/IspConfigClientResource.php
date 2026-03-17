@@ -49,11 +49,33 @@ class IspConfigClientResource extends Resource
                 Tables\Columns\TextColumn::make('synced_at')
                     ->label('Ultima sync')
                     ->since(),
+                Tables\Columns\IconColumn::make('is_default')
+                    ->label('Default')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-star')
+                    ->falseIcon('heroicon-o-star')
+                    ->trueColor('warning')
+                    ->falseColor('gray'),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('server_id')
                     ->label('Server')
                     ->relationship('server', 'name'),
+            ])
+            ->actions([
+                Tables\Actions\Action::make('set_default')
+                    ->label(fn (IspConfigClient $record) => $record->is_default ? '⭐ Default' : 'Imposta default')
+                    ->icon('heroicon-o-star')
+                    ->color(fn (IspConfigClient $record) => $record->is_default ? 'warning' : 'gray')
+                    ->disabled(fn (IspConfigClient $record) => $record->is_default)
+                    ->action(function (IspConfigClient $record) {
+                        $record->setAsDefault();
+                        \Filament\Notifications\Notification::make()
+                            ->title('Cliente default impostato')
+                            ->body("{$record->display_name} è ora il cliente default per il server {$record->server->name}.")
+                            ->success()
+                            ->send();
+                    }),
             ]);
     }
 
