@@ -12,18 +12,16 @@ class WpCliService
 
     /**
      * Esegue un comando WP-CLI nel docroot specificato.
-     * Usa sudo per operare con i permessi corretti sul docroot.
+     * Usa sudo -u con l'utente proprietario del docroot se diverso dall'utente corrente.
      */
     public function run(string $docroot, string $command): string
     {
-        $owner = $this->getDocRootOwner($docroot);
-        $currentUser = posix_getpwuid(posix_geteuid())['name'] ?? 'orchestrator';
+        $owner       = $this->getDocRootOwner($docroot);
+        $currentUser = get_current_user() ?: posix_getpwuid(posix_geteuid())['name'] ?? '';
 
         if ($owner && $owner !== 'root' && $owner !== $currentUser) {
-            // Esegui come proprietario del docroot (es. web14)
             $cmd = "sudo -u {$owner} wp --path={$docroot} {$command} 2>&1";
         } else {
-            // Root o stesso utente — usa --allow-root
             $cmd = "wp --path={$docroot} {$command} --allow-root 2>&1";
         }
 
@@ -31,21 +29,32 @@ class WpCliService
     }
 
     /**
-     * Restituisce l'utente proprietario del docroot.
-     * Legge il proprietario della directory stessa (non del parent).
+     * Legge il proprietario del docroot leggendo la directory /web
+     * oppure la directory padre se /web non esiste ancora.
+     * Usa stat() sulla parent directory che è accessibile a tutti (drwxr-xr-x).
      */
     private function getDocRootOwner(string $docroot): ?string
     {
-        // Prova la directory stessa
-        $path = is_dir($docroot) ? $docroot : dirname($docroot);
+        // Prova prima sul docroot (/web) — potrebbe non esistere ancora
+        // Prova sulla cartella padre (web14) che ha permessi drwxr-xr-x (leggibile da tutti)
+        $parent = dirname($docroot); // /var/www/clients/client2/web14
 
-        $stat = @stat($path);
-        if (! $stat) {
-            return null;
+        // Legge le sottocartelle per trovare l'utente proprietario di cgi-bin o simili
+        // che sono accessibili (drwxr-xr-x)
+        foreach (['cgi-bin', 'tmp'] as $sub) {
+            $path = $parent . '/' . $sub;
+            if (is_dir($path)) {
+                $stat = @stat($path);
+                if ($stat) {
+                    $info = posix_getpwuid($stat['uid']);
+                    if ($info && $info['name'] !== 'root') {
+                        return $info['name'];
+                    }
+                }
+            }
         }
 
-        $info = posix_getpwuid($stat['uid']);
-        return $info['name'] ?? null;
+        return null;
     }
 
     /**

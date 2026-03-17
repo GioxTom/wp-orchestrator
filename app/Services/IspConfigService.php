@@ -221,25 +221,18 @@ class IspConfigService
 
         $domain = $response['response'] ?? [];
 
-        Log::debug("IspConfigService::getDomainDocroot — risposta: " . json_encode($domain));
-
-        // Usa document_root se presente e valido
+        // document_root di ISPConfig NON include /web — va aggiunto
         $webRoot = $domain['document_root'] ?? null;
         if ($webRoot) {
-            // document_root di ISPConfig punta già a /web
-            return rtrim($webRoot, '/');
+            return rtrim($webRoot, '/') . '/web';
         }
 
-        // Costruisce il path standard ISPConfig senza toccare il filesystem
-        // Struttura: /var/www/clients/client{client_id}/web{domain_id}/web
+        // Fallback con client_id dalla risposta
         $clientId = $domain['client_id'] ?? null;
-
         if ($clientId) {
             return "/var/www/clients/client{$clientId}/web{$domainId}/web";
         }
 
-        // Fallback: cerca il client_id dall'username del dominio
-        // ISPConfig usa sempre web{domain_id} come nome cartella
         throw new \RuntimeException(
             "Impossibile determinare il docroot per domain_id={$domainId}. " .
             "Risposta ISPConfig: " . json_encode($domain)
