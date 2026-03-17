@@ -27,7 +27,7 @@ class IspConfigClient extends Model
 
     public function sites(): HasMany
     {
-        return $this->hasMany(Site::class);
+        return $this->hasMany(Site::class, 'ispconfig_client_id');
     }
 
     public function getDisplayNameAttribute(): string
