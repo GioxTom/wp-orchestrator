@@ -315,7 +315,7 @@ class IspConfigService
             );
         }
 
-        // Step 2: crea il DB assegnando l'utente appena creato
+        // Step 2: crea il DB assegnando l'utente appena creato e il sito web
         $response = $this->post('sites_database_add', [
             'session_id' => $this->sessionId,
             'client_id'  => $params['client_id'],
@@ -328,6 +328,7 @@ class IspConfigService
                 'database_charset' => 'utf8mb4',
                 'remote_access'    => 'n',
                 'active'           => 'y',
+                'parent_domain_id' => (int) ($params['domain_id'] ?? 0),
             ],
         ]);
 
