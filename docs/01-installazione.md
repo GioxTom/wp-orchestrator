@@ -31,8 +31,12 @@ apt install -y php8.3-cli php8.3-fpm php8.3-mysql php8.3-xml \
 useradd -m -s /bin/bash orchestrator
 passwd orchestrator   # scegli una password sicura
 usermod -aG www-data orchestrator
-```
 
+
+#QUesto server per utilizzare wp-cli come un utente ispconf senza digitare password.
+echo "orchestrator ALL=(ALL) NOPASSWD: /usr/local/bin/wp" > /etc/sudoers.d/orchestrator-wpcli
+chmod 440 /etc/sudoers.d/orchestrator-wpcli
+```
 ---
 
 ## Step 3 — Composer globale
