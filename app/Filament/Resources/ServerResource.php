@@ -184,6 +184,7 @@ class ServerResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->poll('5s')
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->label('Nome')
