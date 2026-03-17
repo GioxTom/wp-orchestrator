@@ -366,7 +366,7 @@ class BlueprintResource extends Resource
                     ]),
                 Tables\Columns\TextColumn::make('plugin_list')
                     ->label('Plugin')
-                    ->formatStateUsing(fn ($state) => count($state ?? []) . ' plugin'),
+                    ->formatStateUsing(fn ($state) => count(is_array($state) ? $state : []) . ' plugin'),
                 Tables\Columns\IconColumn::make('zip_path')
                     ->label('Tema ZIP')
                     ->boolean()
