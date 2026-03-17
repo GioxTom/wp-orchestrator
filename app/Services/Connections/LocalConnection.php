@@ -30,23 +30,75 @@ class LocalConnection implements ServerConnection
     }
 
     /**
-     * Copia un file locale in un'altra path locale.
+     * Copia un file locale in una path di destinazione.
+     * Usa sudo cp se la destinazione non è scrivibile dall'utente corrente.
      */
     public function upload(string $localPath, string $remotePath): void
     {
         $dir = dirname($remotePath);
 
-        if (! is_dir($dir)) {
-            mkdir($dir, 0755, true);
+        // Prova prima con operazioni PHP dirette
+        if (is_writable($dir) || (! is_dir($dir) && is_writable(dirname($dir)))) {
+            if (! is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+            if (! copy($localPath, $remotePath)) {
+                throw new ServerCommandException("copy {$localPath} {$remotePath}", 'File copy failed', 1);
+            }
+            return;
         }
 
-        if (! copy($localPath, $remotePath)) {
-            throw new ServerCommandException(
-                "copy {$localPath} {$remotePath}",
-                'File copy failed',
-                1
+        // Directory non scrivibile — usa sudo cp
+        // Rileva l'utente proprietario della directory di destinazione
+        $owner = $this->getOwner($dir);
+
+        if ($owner && $owner !== 'root') {
+            $process = Process::fromShellCommandline(
+                "sudo -u {$owner} cp " . escapeshellarg($localPath) . ' ' . escapeshellarg($remotePath)
+            );
+        } else {
+            $process = Process::fromShellCommandline(
+                "sudo cp " . escapeshellarg($localPath) . ' ' . escapeshellarg($remotePath)
             );
         }
+
+        $process->setTimeout(30);
+        $process->run();
+
+        if (! $process->isSuccessful()) {
+            throw new ServerCommandException(
+                "sudo cp {$localPath} {$remotePath}",
+                $process->getErrorOutput() ?: $process->getOutput(),
+                $process->getExitCode()
+            );
+        }
+    }
+
+    private function getOwner(string $path): ?string
+    {
+        // Risale la gerarchia per trovare una directory esistente
+        while ($path && ! is_dir($path)) {
+            $path = dirname($path);
+        }
+
+        if (! $path || $path === '/') {
+            return null;
+        }
+
+        // Cerca sottodirectory accessibili per leggere il proprietario
+        foreach (scandir($path) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..') continue;
+            $full = $path . '/' . $entry;
+            $stat = @stat($full);
+            if ($stat) {
+                $info = posix_getpwuid($stat['uid']);
+                if ($info && $info['name'] !== 'root') {
+                    return $info['name'];
+                }
+            }
+        }
+
+        return null;
     }
 
     public function test(): bool

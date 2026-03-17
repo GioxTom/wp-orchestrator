@@ -132,20 +132,36 @@ class BlueprintService
         Site      $site,
         Blueprint $blueprint
     ): void {
-        $childSlug    = $parentSlug . '-child';
-        $childDir     = "{$docroot}/wp-content/themes/{$childSlug}";
+        $childSlug = $parentSlug . '-child';
+        $childDir  = "{$docroot}/wp-content/themes/{$childSlug}";
 
-        if (! is_dir($childDir)) {
-            mkdir($childDir, 0755, true);
+        // Genera i file in una directory temporanea locale (orchestrator ha permessi)
+        $tmpDir = sys_get_temp_dir() . '/child_' . uniqid();
+        mkdir($tmpDir, 0755, true);
+
+        try {
+            // Genera style.css
+            $styleCss = $this->buildChildStyleCss($parentSlug, $childSlug, $site->site_name);
+            file_put_contents("{$tmpDir}/style.css", $styleCss);
+
+            // Genera functions.php
+            $functionsPHP = $this->buildChildFunctionsPHP($blueprint->child_skeleton, $site);
+            file_put_contents("{$tmpDir}/functions.php", $functionsPHP);
+
+            // Crea la directory del child theme nel docroot via WP-CLI (come web14)
+            $this->wpCli->run($docroot, "eval 'wp_mkdir_p(get_theme_root() . \"/" . $childSlug . "\");'");
+
+            // Carica i file tramite connection->upload() che usa sudo
+            $connection = $site->server->connection();
+            $connection->upload("{$tmpDir}/style.css", "{$childDir}/style.css");
+            $connection->upload("{$tmpDir}/functions.php", "{$childDir}/functions.php");
+
+        } finally {
+            // Pulizia tmp
+            @unlink("{$tmpDir}/style.css");
+            @unlink("{$tmpDir}/functions.php");
+            @rmdir($tmpDir);
         }
-
-        // Genera style.css del child
-        $styleCss = $this->buildChildStyleCss($parentSlug, $childSlug, $site->site_name);
-        file_put_contents("{$childDir}/style.css", $styleCss);
-
-        // Genera functions.php del child dallo skeleton o da default
-        $functionsPHP = $this->buildChildFunctionsPHP($blueprint->child_skeleton, $site);
-        file_put_contents("{$childDir}/functions.php", $functionsPHP);
 
         // Attiva il child theme
         $this->wpCli->themeActivate($docroot, $childSlug);
