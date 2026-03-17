@@ -36,7 +36,8 @@ usermod -aG www-data orchestrator
 #QUesto server per utilizzare wp-cli come un utente ispconf senza digitare password.
 echo "orchestrator ALL=(ALL) NOPASSWD: /usr/local/bin/wp" > /etc/sudoers.d/orchestrator-wpcli
 echo "orchestrator ALL=(ALL) NOPASSWD: /bin/cp" >> /etc/sudoers.d/orchestrator-wpcli
-
+echo "orchestrator ALL=(ALL) NOPASSWD: /bin/mkdir" >> /etc/sudoers.d/orchestrator-wpcli
+echo "orchestrator ALL=(ALL) NOPASSWD: /bin/chmod" >> /etc/sudoers.d/orchestrator-wpcli
 chmod 440 /etc/sudoers.d/orchestrator-wpcli
 ```
 ---
