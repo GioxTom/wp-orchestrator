@@ -245,17 +245,16 @@ class SiteResource extends Resource
                         // Pulisce i log falliti precedenti
                         $record->provisioningLogs()->delete();
 
-                        // Reset stato
+                        // Reset stato — mantiene docroot se già salvato
                         $record->update([
-                            'status'             => 'provisioning',
-                            'current_step'       => null,
+                            'status'              => 'provisioning',
+                            'current_step'        => null,
                             'ispconfig_domain_id' => null,
-                            'ispconfig_db_id'    => null,
-                            'docroot'            => null,
-                            'db_name'            => null,
-                            'db_user'            => null,
-                            'db_password'        => null,
-                            'wp_admin_password'  => null,
+                            'ispconfig_db_id'     => null,
+                            'db_name'             => null,
+                            'db_user'             => null,
+                            'db_password'         => null,
+                            'wp_admin_password'   => null,
                         ]);
 
                         dispatch(new \App\Jobs\Provisioning\CreateIspConfigDomainJob($record));
