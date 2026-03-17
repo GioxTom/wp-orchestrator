@@ -15,7 +15,7 @@ class VarnishService
      */
     public function ban(string $domain): string
     {
-        $cmd = "varnishadm ban 'req.http.host == {$domain}'";
+        $cmd = "sudo varnishadm ban 'req.http.host == {$domain}'";
         return $this->connection->run($cmd);
     }
 
