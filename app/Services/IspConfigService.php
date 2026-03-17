@@ -86,28 +86,34 @@ class IspConfigService
             'session_id' => $this->sessionId,
         ]);
 
-        // Log risposta grezza per debug
-        Log::debug("IspConfigService::syncClients — risposta raw: " . json_encode($response));
+        $result = $response['response'] ?? [];
 
-        $clients = $response['response'] ?? [];
-
-        // ISPConfig può restituire false o "" se non ci sono clienti
-        if (! is_array($clients)) {
-            Log::info("IspConfigService::syncClients — risposta non-array: " . json_encode($clients));
-            return 0;
-        }
-
-        if (empty($clients)) {
-            Log::info("IspConfigService::syncClients — array vuoto, nessun cliente in ISPConfig");
+        if (! is_array($result) || empty($result)) {
+            Log::info("IspConfigService::syncClients — nessun cliente trovato");
             return 0;
         }
 
         $count = 0;
 
-        foreach ($clients as $client) {
-            // Salta se il record non è un array (protezione extra)
-            if (! is_array($client)) {
-                continue;
+        // ISPConfig restituisce array di ID (es. ["1","2"])
+        // Per ogni ID dobbiamo chiamare client_get per ottenere i dati completi
+        foreach ($result as $item) {
+
+            // Se è già un array con dati completi (alcune versioni ISPConfig)
+            if (is_array($item)) {
+                $client = $item;
+            } else {
+                // È un ID — recupera i dati del cliente
+                $clientResponse = $this->post('client_get', [
+                    'session_id' => $this->sessionId,
+                    'client_id'  => (int) $item,
+                ]);
+                $client = $clientResponse['response'] ?? null;
+
+                if (! is_array($client)) {
+                    Log::warning("IspConfigService::syncClients — dati mancanti per client_id {$item}");
+                    continue;
+                }
             }
 
             IspConfigClient::updateOrCreate(
