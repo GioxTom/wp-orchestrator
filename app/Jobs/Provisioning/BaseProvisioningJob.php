@@ -73,6 +73,11 @@ abstract class BaseProvisioningJob implements ShouldQueue
                 ]);
             }
 
+        } catch (\App\Exceptions\ImportDetectedException $e) {
+            // Importazione rilevata — non è un errore, pipeline interrotta intenzionalmente
+            $this->log->markSuccess($e->getMessage());
+            // Lo stato del sito è già stato aggiornato dentro execute()
+
         } catch (\Throwable $e) {
             Log::error("ProvisioningJob {$this->stepLabel()} fallito per sito #{$this->site->id}: " . $e->getMessage());
 

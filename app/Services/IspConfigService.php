@@ -162,6 +162,92 @@ class IspConfigService
     // Gestione domini web
     // ────────────────────────────────────────────────────────────────────────
 
+    /**
+     * Cerca un dominio in ISPConfig per nome.
+     * Restituisce l'ID del dominio se trovato, null altrimenti.
+     */
+    public function findDomainByName(string $domain): ?int
+    {
+        $this->connect();
+
+        $response = $this->post('sites_web_domain_get_by_domain', [
+            'session_id' => $this->sessionId,
+            'domain'     => $domain,
+        ]);
+
+        $result = $response['response'] ?? null;
+
+        // Può restituire array con domain_id, oppure false/null se non trovato
+        if (is_array($result) && ! empty($result['domain_id'])) {
+            return (int) $result['domain_id'];
+        }
+
+        // Fallback: cerca nella lista completa
+        // (alcuni ISPConfig non hanno sites_web_domain_get_by_domain)
+        try {
+            $allResponse = $this->post('sites_web_domain_get_by_domain', [
+                'session_id' => $this->sessionId,
+                'domain'     => $domain,
+            ]);
+        } catch (\Throwable) {
+            // Metodo non disponibile — cerca manualmente
+            return $this->findDomainByNameFallback($domain);
+        }
+
+        return null;
+    }
+
+    /**
+     * Fallback: scorre tutti i domini e cerca per nome.
+     * Usato se sites_web_domain_get_by_domain non è disponibile.
+     */
+    private function findDomainByNameFallback(string $domain): ?int
+    {
+        try {
+            $response = $this->post('sites_web_domain_get_all_by_user', [
+                'session_id' => $this->sessionId,
+                'client_id'  => 0, // 0 = tutti
+            ]);
+
+            $domains = $response['response'] ?? [];
+            if (! is_array($domains)) return null;
+
+            foreach ($domains as $d) {
+                if (($d['domain'] ?? '') === $domain) {
+                    return (int) $d['domain_id'];
+                }
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Recupera il docroot di un dominio ISPConfig dato il suo ID.
+     */
+    public function getDomainDocroot(int $domainId): string
+    {
+        $this->connect();
+
+        $response = $this->post('sites_web_domain_get', [
+            'session_id' => $this->sessionId,
+            'domain_id'  => $domainId,
+        ]);
+
+        $domain  = $response['response'] ?? [];
+        $webRoot = $domain['document_root'] ?? null;
+
+        if ($webRoot && is_dir($webRoot)) {
+            return rtrim($webRoot, '/');
+        }
+
+        // Fallback standard ISPConfig path
+        // /var/www/clients/client{N}/web{N}/web
+        return "/var/www/clients/client{$domain['sys_userid']}/web{$domainId}/web";
+    }
+
     public function createWebDomain(array $params): int
     {
         $this->connect();

@@ -156,7 +156,17 @@ class SiteResource extends Resource
                         'success' => 'active',
                         'danger'  => 'error',
                         'gray'    => 'disabled',
-                    ]),
+                        'info'    => 'import_blueprint_pending',
+                    ])
+                    ->formatStateUsing(fn ($state) => match ($state) {
+                        'pending'                   => 'In attesa',
+                        'provisioning'              => 'Provisioning',
+                        'active'                    => 'Attivo',
+                        'disabled'                  => 'Disabilitato',
+                        'error'                     => 'Errore',
+                        'import_blueprint_pending'  => '⚠️ Conferma blueprint',
+                        default                     => $state,
+                    }),
 
                 Tables\Columns\TextColumn::make('current_step')
                     ->label('Step corrente')
@@ -240,6 +250,52 @@ class SiteResource extends Resource
                             ->body("Nuova password: <code>{$newPassword}</code><br>Copiala ora — non verrà mostrata di nuovo.")
                             ->success()
                             ->persistent()
+                            ->send();
+                    }),
+
+                // Conferma applicazione blueprint (sito importato con WP già installato)
+                Tables\Actions\Action::make('confirm_blueprint')
+                    ->label('Applica blueprint')
+                    ->icon('heroicon-o-puzzle-piece')
+                    ->color('warning')
+                    ->visible(fn (Site $record) => $record->status === 'import_blueprint_pending')
+                    ->requiresConfirmation()
+                    ->modalHeading('Applicare il blueprint al sito importato?')
+                    ->modalDescription(fn (Site $record) =>
+                        "Il sito {$record->domain} è stato importato con WordPress già installato. " .
+                        "Il blueprint \"{$record->blueprint?->name}\" verrà applicato: " .
+                        "tema e plugin verranno installati/sostituiti. " .
+                        "I contenuti esistenti NON verranno toccati."
+                    )
+                    ->modalSubmitActionLabel('Sì, applica blueprint')
+                    ->action(function (Site $record) {
+                        $record->update([
+                            'status'       => 'provisioning',
+                            'current_step' => 'Importazione WordPress',
+                        ]);
+                        dispatch(new \App\Jobs\Provisioning\ImportWordPressJob($record));
+                        Notification::make()
+                            ->title('Blueprint in applicazione')
+                            ->body('Il sito verrà aggiornato a breve.')
+                            ->success()
+                            ->send();
+                    }),
+
+                Tables\Actions\Action::make('skip_blueprint')
+                    ->label('Salta blueprint')
+                    ->icon('heroicon-o-forward')
+                    ->color('gray')
+                    ->visible(fn (Site $record) => $record->status === 'import_blueprint_pending')
+                    ->requiresConfirmation()
+                    ->modalHeading('Saltare il blueprint?')
+                    ->modalDescription('Il sito verrà importato così com\'è, senza applicare il blueprint.')
+                    ->modalSubmitActionLabel('Sì, salta')
+                    ->action(function (Site $record) {
+                        $record->update(['blueprint_id' => null]);
+                        dispatch(new \App\Jobs\Provisioning\ImportWordPressJob($record));
+                        Notification::make()
+                            ->title('Importazione avviata senza blueprint')
+                            ->success()
                             ->send();
                     }),
 
