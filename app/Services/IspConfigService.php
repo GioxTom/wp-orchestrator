@@ -86,11 +86,19 @@ class IspConfigService
             'session_id' => $this->sessionId,
         ]);
 
+        // Log risposta grezza per debug
+        Log::debug("IspConfigService::syncClients — risposta raw: " . json_encode($response));
+
         $clients = $response['response'] ?? [];
 
         // ISPConfig può restituire false o "" se non ci sono clienti
         if (! is_array($clients)) {
-            Log::info("IspConfigService::syncClients — nessun cliente trovato (response: " . json_encode($clients) . ")");
+            Log::info("IspConfigService::syncClients — risposta non-array: " . json_encode($clients));
+            return 0;
+        }
+
+        if (empty($clients)) {
+            Log::info("IspConfigService::syncClients — array vuoto, nessun cliente in ISPConfig");
             return 0;
         }
 
@@ -412,6 +420,12 @@ class IspConfigService
 
         // ISPConfig restituisce {"code": "ok", "message": "...", "response": ...}
         if (isset($decoded['code']) && $decoded['code'] !== 'ok') {
+            // Log specifico per errori di permessi
+            if (str_contains(strtolower($decoded['message'] ?? ''), 'permission')) {
+                Log::warning("IspConfigService: permesso mancante per [{$method}] — " .
+                    "verifica i permessi del Remote User in ISPConfig → System → Remote Users. " .
+                    "Messaggio: {$decoded['message']}");
+            }
             throw new \RuntimeException(
                 "ISPConfig API [{$method}]: {$decoded['message']} (code: {$decoded['code']})"
             );
