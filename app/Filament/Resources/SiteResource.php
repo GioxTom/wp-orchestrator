@@ -231,6 +231,42 @@ class SiteResource extends Resource
                     ->relationship('server', 'name'),
             ])
             ->actions([
+                // Riprova provisioning dopo un errore
+                Tables\Actions\Action::make('retry')
+                    ->label('Riprova')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->visible(fn (Site $record) => $record->status === 'error')
+                    ->requiresConfirmation()
+                    ->modalHeading('Riprendere il provisioning?')
+                    ->modalDescription('Il provisioning ripartirà dall\'inizio. Assicurati di aver corretto il problema prima di riprovare.')
+                    ->modalSubmitActionLabel('Sì, riprova')
+                    ->action(function (Site $record) {
+                        // Pulisce i log falliti precedenti
+                        $record->provisioningLogs()->delete();
+
+                        // Reset stato
+                        $record->update([
+                            'status'             => 'provisioning',
+                            'current_step'       => null,
+                            'ispconfig_domain_id' => null,
+                            'ispconfig_db_id'    => null,
+                            'docroot'            => null,
+                            'db_name'            => null,
+                            'db_user'            => null,
+                            'db_password'        => null,
+                            'wp_admin_password'  => null,
+                        ]);
+
+                        dispatch(new \App\Jobs\Provisioning\CreateIspConfigDomainJob($record));
+
+                        Notification::make()
+                            ->title('Provisioning riavviato')
+                            ->body('Il sito verrà ricreato dall\'inizio.')
+                            ->success()
+                            ->send();
+                    }),
+
                 // Visualizza log provisioning
                 Tables\Actions\Action::make('logs')
                     ->label('Log')
