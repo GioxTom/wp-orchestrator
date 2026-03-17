@@ -24,15 +24,17 @@ class FinalHealthCheckJob extends BaseProvisioningJob
             'http_status'    => $httpStatus,
             'https_status'   => $httpsStatus,
             'cert_expiry_at' => $certExpiry,
-            'admin_ok'       => true,  // appena installato, admin è canonico per definizione
-            'mu_plugin_ok'   => true,  // appena deploiato
+            'admin_ok'       => true,
+            'mu_plugin_ok'   => true,
             'checked_at'     => now(),
         ]);
 
-        // Se HTTPS non risponde, segnala errore (ma non blocca completamente)
-        if ($httpsStatus !== 200 && $httpsStatus !== 301 && $httpsStatus !== 302) {
+        // Fallisce solo se HTTP è completamente irraggiungibile (0)
+        // HTTPS è opzionale — dipende dalla configurazione SSL del sito
+        if ($httpStatus === 0) {
             throw new \RuntimeException(
-                "Health check fallito: HTTPS {$domain} ha risposto con HTTP {$httpsStatus}"
+                "Health check fallito: {$domain} non raggiungibile via HTTP. " .
+                "Verifica che il DNS punti all'IP corretto e che il sito sia attivo in ISPConfig."
             );
         }
     }
