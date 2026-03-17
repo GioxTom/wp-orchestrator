@@ -16,13 +16,14 @@ class WpCliService
      */
     public function run(string $docroot, string $command): string
     {
-        // Rileva l'utente proprietario del docroot
         $owner = $this->getDocRootOwner($docroot);
+        $currentUser = posix_getpwuid(posix_geteuid())['name'] ?? 'orchestrator';
 
-        if ($owner && $owner !== posix_getpwuid(posix_geteuid())['name']) {
-            // Esegui come proprietario del docroot
+        if ($owner && $owner !== 'root' && $owner !== $currentUser) {
+            // Esegui come proprietario del docroot (es. web14)
             $cmd = "sudo -u {$owner} wp --path={$docroot} {$command} 2>&1";
         } else {
+            // Root o stesso utente — usa --allow-root
             $cmd = "wp --path={$docroot} {$command} --allow-root 2>&1";
         }
 
@@ -31,14 +32,14 @@ class WpCliService
 
     /**
      * Restituisce l'utente proprietario del docroot.
+     * Legge il proprietario della directory stessa (non del parent).
      */
     private function getDocRootOwner(string $docroot): ?string
     {
-        if (! is_dir($docroot)) {
-            return null;
-        }
+        // Prova la directory stessa
+        $path = is_dir($docroot) ? $docroot : dirname($docroot);
 
-        $stat = stat($docroot);
+        $stat = @stat($path);
         if (! $stat) {
             return null;
         }
