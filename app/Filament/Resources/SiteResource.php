@@ -143,6 +143,7 @@ class SiteResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            ->poll('5s')
             ->columns([
                 Tables\Columns\TextColumn::make('domain')
                     ->label('Dominio')
