@@ -42,10 +42,16 @@ class SiteResource extends Resource
                         ->options(Server::where('status', 'active')->pluck('name', 'id'))
                         ->required()
                         ->live()
-                        ->afterStateUpdated(fn ($set) => [
-                            $set('ispconfig_client_id', null),
-                            $set('php_version_id', null),
-                        ]),
+                        ->afterStateUpdated(function ($state, Forms\Set $set) {
+                            $set('ispconfig_client_id', null);
+                            // Precompila la versione PHP con il default del server
+                            if ($state) {
+                                $server = Server::find($state);
+                                $set('php_version_id', $server?->default_php_version_id);
+                            } else {
+                                $set('php_version_id', null);
+                            }
+                        }),
 
                     Forms\Components\Select::make('ispconfig_client_id')
                         ->label('Cliente ISPConfig')

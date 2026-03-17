@@ -24,6 +24,7 @@ class Server extends Model
         'ispconfig_user',
         'ispconfig_password',
         'status',
+        'default_php_version_id',
         'notes',
     ];
 
@@ -48,6 +49,11 @@ class Server extends Model
     public function phpVersions(): HasMany
     {
         return $this->hasMany(IspConfigPhpVersion::class);
+    }
+
+    public function defaultPhpVersion(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(IspConfigPhpVersion::class, 'default_php_version_id');
     }
 
     /**

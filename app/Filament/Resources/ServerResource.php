@@ -178,6 +178,19 @@ class ServerResource extends Resource
                 ->label('Note')
                 ->placeholder('Informazioni aggiuntive sul server, versione OS, ecc.')
                 ->columnSpanFull(),
+
+            Forms\Components\Section::make('Impostazioni predefinite')
+                ->schema([
+                    Forms\Components\Select::make('default_php_version_id')
+                        ->label('Versione PHP predefinita')
+                        ->options(fn (Get $get, $record) => $record
+                            ? \App\Models\IspConfigPhpVersion::where('server_id', $record->id)
+                                ->pluck('label', 'id')
+                            : [])
+                        ->placeholder('Seleziona dopo la prima sync')
+                        ->helperText('Verrà preselezionata automaticamente durante la creazione di un nuovo sito su questo server.')
+                        ->searchable(),
+                ]),
         ]);
     }
 
