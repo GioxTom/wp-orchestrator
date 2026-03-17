@@ -291,6 +291,27 @@ class IspConfigService
         return (int) $domainId;
     }
 
+    /**
+     * Verifica se un database esiste in ISPConfig tramite API.
+     * Usato per evitare ricreazione di DB già esistenti.
+     */
+    public function databaseExists(int $dbId): bool
+    {
+        $this->connect();
+
+        try {
+            $response = $this->post('sites_database_get', [
+                'session_id' => $this->sessionId,
+                'primary_id' => $dbId,
+            ]);
+
+            $result = $response['response'] ?? null;
+            return is_array($result) && ! empty($result['database_id'] ?? $result['database_name'] ?? null);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public function createDatabase(array $params): int
     {
         $this->connect();

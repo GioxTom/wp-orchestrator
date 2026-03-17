@@ -12,25 +12,25 @@ class CreateIspConfigDatabaseJob extends BaseProvisioningJob
 
     protected function execute(): void
     {
-        $server = $this->site->server;
-        $client = $this->site->ispConfigClient;
-
-        // Se il DB è già stato creato in un tentativo precedente, non ricreare
-        if ($this->site->db_name && $this->site->ispconfig_db_id) {
-            $this->log->update(['output' => "DB già presente ({$this->site->db_name}), skip creazione."]);
-            return;
-        }
-
-        // Genera nomi leggibili e correlati tra DB e utente
-        $suffix  = Str::random(4);
-        $base    = 'wp_' . Str::slug(Str::limit($this->site->domain, 15), '_');
-        $dbName  = $base . '_' . $suffix;
-        $dbUser  = $base . '_usr';          // stesso prefisso del DB
-        $dbPassword = Str::random(24);
-
+        $server    = $this->site->server;
+        $client    = $this->site->ispConfigClient;
         $ispConfig = new IspConfigService($server);
 
         try {
+            // Verifica se il DB esiste già in ISPConfig — non nel nostro DB locale
+            // che potrebbe avere dati residui di tentativi falliti
+            if ($this->site->ispconfig_db_id && $ispConfig->databaseExists($this->site->ispconfig_db_id)) {
+                $this->log->update(['output' => "DB già presente in ISPConfig (ID: {$this->site->ispconfig_db_id}), skip creazione."]);
+                return;
+            }
+
+            // Genera nomi leggibili: stesso prefisso per DB e utente
+            $suffix     = Str::random(4);
+            $base       = 'wp_' . Str::slug(Str::limit($this->site->domain, 15), '_');
+            $dbName     = $base . '_' . $suffix;
+            $dbUser     = $base . '_usr';
+            $dbPassword = Str::random(24);
+
             $dbId = $ispConfig->createDatabase([
                 'client_id'   => $client->ispconfig_client_id,
                 'domain_id'   => $this->site->ispconfig_domain_id,
@@ -47,7 +47,6 @@ class CreateIspConfigDatabaseJob extends BaseProvisioningJob
             ]);
 
             // Attende che ISPConfig propaghi l'utente a MariaDB
-            // ISPConfig usa un job queue interno — tipicamente 5-15 secondi
             $this->waitForDbAccess($dbUser, $dbPassword);
 
         } finally {
@@ -72,7 +71,7 @@ class CreateIspConfigDatabaseJob extends BaseProvisioningJob
                 return; // Connessione riuscita
             } catch (\PDOException) {
                 sleep(5);
-}
+            }
         }
 
         throw new \RuntimeException(
