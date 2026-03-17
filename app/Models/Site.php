@@ -58,7 +58,7 @@ class Site extends Model
 
     public function ispConfigClient(): BelongsTo
     {
-        return $this->belongsTo(IspConfigClient::class);
+        return $this->belongsTo(IspConfigClient::class, 'ispconfig_client_id');
     }
 
     public function blueprint(): BelongsTo

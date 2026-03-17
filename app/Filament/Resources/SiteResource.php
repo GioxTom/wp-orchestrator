@@ -408,7 +408,7 @@ class SiteResource extends Resource
                     }),
 
                 Tables\Actions\EditAction::make()
-                    ->visible(fn (Site $record) => $record->status === 'pending'),
+                    ->visible(fn (Site $record) => in_array($record->status, ['pending', 'error'])),
             ]);
     }
 
