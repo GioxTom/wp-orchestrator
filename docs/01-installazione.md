@@ -38,6 +38,7 @@ echo "orchestrator ALL=(ALL) NOPASSWD: /usr/local/bin/wp" > /etc/sudoers.d/orche
 echo "orchestrator ALL=(ALL) NOPASSWD: /bin/cp" >> /etc/sudoers.d/orchestrator-wpcli
 echo "orchestrator ALL=(ALL) NOPASSWD: /bin/mkdir" >> /etc/sudoers.d/orchestrator-wpcli
 echo "orchestrator ALL=(ALL) NOPASSWD: /bin/chmod" >> /etc/sudoers.d/orchestrator-wpcli
+echo "orchestrator ALL=(ALL) NOPASSWD: /usr/bin/varnishadm" >> /etc/sudoers.d/orchestrator-wpcli
 chmod 440 /etc/sudoers.d/orchestrator-wpcli
 ```
 ---
