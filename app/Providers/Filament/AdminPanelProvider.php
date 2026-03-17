@@ -30,11 +30,13 @@ class AdminPanelProvider extends PanelProvider
             ->login()
             ->colors(['primary' => Color::Indigo])
             ->brandName('WP Orchestrator')
+            ->sidebarCollapsibleOnDesktop()
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->navigationGroups([
-                NavigationGroup::make('Siti'),
+                NavigationGroup::make('Siti')
+                    ->collapsed(false),
                 NavigationGroup::make('Configurazione')
                     ->collapsed(),
                 NavigationGroup::make('Sistema')

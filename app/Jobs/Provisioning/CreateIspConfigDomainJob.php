@@ -24,6 +24,13 @@ class CreateIspConfigDomainJob extends BaseProvisioningJob
         $phpVersion = $this->site->phpVersion;
         $ispConfig  = new IspConfigService($server);
 
+        if (! $client) {
+            throw new \RuntimeException(
+                "Cliente ISPConfig non trovato per il sito #{$this->site->id}. " .
+                "Verifica che la sync ISPConfig sia stata eseguita e che il cliente esista."
+            );
+        }
+
         try {
             // Verifica se il dominio esiste già in ISPConfig
             $existingDomainId = $ispConfig->findDomainByName($this->site->domain);
