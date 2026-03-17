@@ -52,10 +52,10 @@ class BlueprintService
             throw new \RuntimeException("Blueprint ZIP non trovato: {$zipFullPath}");
         }
 
-        // Copia lo ZIP in una path temporanea accessibile al server
+        // Copia lo ZIP in /tmp con permessi world-readable
         $tmpPath = '/tmp/blueprint_theme_' . uniqid() . '.zip';
         copy($zipFullPath, $tmpPath);
-        chmod($tmpPath, 0644);
+        chmod($tmpPath, 0644); // leggibile da tutti gli utenti incluso web14
 
         $this->wpCli->themeInstall($docroot, $tmpPath, false);
 

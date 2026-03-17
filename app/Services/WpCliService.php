@@ -102,7 +102,7 @@ class WpCliService
     public function pluginInstall(string $docroot, string $slugOrPath, bool $activate = true): string
     {
         $activateFlag = $activate ? '--activate' : '';
-        return $this->run($docroot, "plugin install {$slugOrPath} {$activateFlag}");
+        return $this->run($docroot, "plugin install {$slugOrPath} --force {$activateFlag}");
     }
 
     /**
@@ -111,7 +111,7 @@ class WpCliService
     public function themeInstall(string $docroot, string $slugOrPath, bool $activate = false): string
     {
         $activateFlag = $activate ? '--activate' : '';
-        return $this->run($docroot, "theme install {$slugOrPath} {$activateFlag}");
+        return $this->run($docroot, "theme install {$slugOrPath} --force {$activateFlag}");
     }
 
     /**
