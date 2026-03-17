@@ -218,13 +218,9 @@ class BlueprintService
     {
         return <<<CSS
 /*
- Theme Name:   {$siteName} Child
- Theme URI:    https://example.com/{$childSlug}
- Description:  Child theme for {$siteName}
- Author:       WP Orchestrator
- Template:     {$parentSlug}
- Version:      1.0.0
- Text Domain:  {$childSlug}
+Theme Name: {$siteName} Child
+Template:   {$parentSlug}
+Version:    1.0.0
 */
 CSS;
     }
@@ -278,7 +274,7 @@ PHP;
     }
 
     /**
-     * Estrae lo slug del tema dal path ZIP (es. /path/to/generatepress.zip → generatepress).
+     * Estrae lo slug del tema leggendo il nome della cartella principale dentro lo ZIP.
      */
     private function extractThemeSlug(?string $zipPath): string
     {
@@ -286,6 +282,30 @@ PHP;
             return 'unknown-theme';
         }
 
+        $zipFullPath = Storage::disk('local')->path($zipPath);
+
+        if (! file_exists($zipFullPath)) {
         return Str::beforeLast(basename($zipPath), '.zip');
+    }
+
+        // Legge il nome della prima cartella dentro lo ZIP
+        $zip = new \ZipArchive();
+        if ($zip->open($zipFullPath) !== true) {
+            return Str::beforeLast(basename($zipPath), '.zip');
+}
+
+        $slug = null;
+        for ($i = 0; $i < $zip->numFiles; $i++) {
+            $name  = $zip->getNameIndex($i);
+            $parts = explode('/', trim($name, '/'));
+            if (! empty($parts[0])) {
+                $slug = $parts[0];
+                break;
+            }
+        }
+
+        $zip->close();
+
+        return $slug ?? Str::beforeLast(basename($zipPath), '.zip');
     }
 }
