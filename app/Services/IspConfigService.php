@@ -184,55 +184,55 @@ class IspConfigService
     {
         $this->connect();
 
-        $response = $this->post('sites_web_domain_get_by_domain', [
-            'session_id' => $this->sessionId,
-            'domain'     => $domain,
-        ]);
-
-        $result = $response['response'] ?? null;
-
-        // Può restituire array con domain_id, oppure false/null se non trovato
-        if (is_array($result) && ! empty($result['domain_id'])) {
-            return (int) $result['domain_id'];
-        }
-
-        // Fallback: cerca nella lista completa
-        // (alcuni ISPConfig non hanno sites_web_domain_get_by_domain)
-        try {
-            $allResponse = $this->post('sites_web_domain_get_by_domain', [
-                'session_id' => $this->sessionId,
-                'domain'     => $domain,
-            ]);
-        } catch (\Throwable) {
-            // Metodo non disponibile — cerca manualmente
-            return $this->findDomainByNameFallback($domain);
-        }
-
-        return null;
-    }
-
-    /**
-     * Fallback: scorre tutti i domini e cerca per nome.
-     * Usato se sites_web_domain_get_by_domain non è disponibile.
-     */
-    private function findDomainByNameFallback(string $domain): ?int
-    {
+        // Cerca tra tutti i domini web del server
         try {
             $response = $this->post('sites_web_domain_get_all_by_user', [
                 'session_id' => $this->sessionId,
-                'client_id'  => 0, // 0 = tutti
+                'client_id'  => 0,
             ]);
 
             $domains = $response['response'] ?? [];
-            if (! is_array($domains)) return null;
 
-            foreach ($domains as $d) {
-                if (($d['domain'] ?? '') === $domain) {
-                    return (int) $d['domain_id'];
+            if (is_array($domains)) {
+                foreach ($domains as $item) {
+                    // ISPConfig può restituire array di ID o array di oggetti
+                    if (is_array($item) && ($item['domain'] ?? '') === $domain) {
+                        return (int) $item['domain_id'];
+                    }
                 }
             }
         } catch (\Throwable) {
-            return null;
+            // Metodo non disponibile, prova con get_all
+        }
+
+        // Fallback: lista tutti i domini e cerca
+        try {
+            $response = $this->post('sites_web_domain_get_all', [
+                'session_id' => $this->sessionId,
+            ]);
+
+            $domains = $response['response'] ?? [];
+
+            if (! is_array($domains)) {
+                return null;
+            }
+
+            foreach ($domains as $item) {
+                if (! is_array($item)) {
+                    // Array di ID — recupera il dettaglio
+                    $detail = $this->post('sites_web_domain_get', [
+                        'session_id' => $this->sessionId,
+                        'domain_id'  => (int) $item,
+                    ]);
+                    $item = $detail['response'] ?? [];
+                }
+
+                if (($item['domain'] ?? '') === $domain) {
+                    return (int) ($item['domain_id'] ?? 0) ?: null;
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning("IspConfigService::findDomainByName — impossibile cercare dominio: " . $e->getMessage());
         }
 
         return null;
