@@ -62,7 +62,7 @@ class WpCliService
      */
     public function coreDownload(string $docroot, string $locale = 'en_US'): string
     {
-        return $this->run($docroot, "core download --locale={$locale}");
+        return $this->run($docroot, "core download --locale={$locale} --force");
     }
 
     /**
