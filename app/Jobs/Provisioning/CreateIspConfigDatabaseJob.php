@@ -46,8 +46,38 @@ class CreateIspConfigDatabaseJob extends BaseProvisioningJob
                 'db_password'     => $dbPassword,
             ]);
 
+            // Attende che ISPConfig propaghi l'utente a MariaDB
+            // ISPConfig usa un job queue interno — tipicamente 5-15 secondi
+            $this->waitForDbAccess($dbUser, $dbPassword);
+
         } finally {
             $ispConfig->disconnect();
         }
+    }
+
+    /**
+     * Attende che ISPConfig propaghi l'utente DB a MariaDB.
+     * ISPConfig usa un job queue interno — ci vogliono alcuni secondi.
+     */
+    private function waitForDbAccess(string $dbUser, string $dbPassword, int $maxAttempts = 12): void
+    {
+        for ($i = 0; $i < $maxAttempts; $i++) {
+            try {
+                new \PDO(
+                    'mysql:host=localhost;charset=utf8mb4',
+                    $dbUser,
+                    $dbPassword,
+                    [\PDO::ATTR_TIMEOUT => 3]
+                );
+                return; // Connessione riuscita
+            } catch (\PDOException) {
+                sleep(5);
+}
+        }
+
+        throw new \RuntimeException(
+            "Utente DB '{$dbUser}' non propagato da ISPConfig dopo " .
+            ($maxAttempts * 5) . " secondi. Verifica il job queue di ISPConfig."
+        );
     }
 }
