@@ -123,34 +123,38 @@ class LogViewerPage extends Page
      */
     private function tailFile(string $path, int $lines): string
     {
-        $fp      = fopen($path, 'r');
-        $buffer  = '';
-        $found   = 0;
-        $pos     = -1;
-        $size    = filesize($path);
+        $size = filesize($path);
 
         if ($size === 0) {
-            fclose($fp);
             return '';
         }
 
-        // Legge il file al contrario a blocchi da 4KB
-        while ($found <= $lines && abs($pos) < $size) {
-            $seek = max(-$size, $pos * 4096);
-            fseek($fp, $seek, SEEK_END);
-            $chunk  = fread($fp, abs($seek) - strlen($buffer));
-            $buffer = $chunk . $buffer;
+        // Se il file è piccolo lo leggiamo tutto direttamente
+        if ($size < 102400) { // < 100KB
+            $all = file_get_contents($path);
+            $allLines = explode("\n", $all);
+            return implode("\n", array_slice($allLines, -($lines + 1)));
+        }
+
+        // File grande: leggi dal fondo a blocchi
+        $fp      = fopen($path, 'r');
+        $buffer  = '';
+        $found   = 0;
+        $chunk   = 4096;
+        $offset  = $size;
+
+        while ($found <= $lines && $offset > 0) {
+            $readSize = min($chunk, $offset);
+            $offset  -= $readSize;
+            fseek($fp, $offset);
+            $buffer = fread($fp, $readSize) . $buffer;
             $found  = substr_count($buffer, "\n");
-            $pos--;
         }
 
         fclose($fp);
 
-        // Prende solo le ultime N righe
         $allLines = explode("\n", $buffer);
-        $tail     = array_slice($allLines, -($lines + 1));
-
-        return implode("\n", $tail);
+        return implode("\n", array_slice($allLines, -($lines + 1)));
     }
 
     private function formatSize(int $bytes): string
