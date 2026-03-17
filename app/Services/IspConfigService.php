@@ -295,29 +295,39 @@ class IspConfigService
     {
         $this->connect();
 
-        $response = $this->post('sites_database_add', [
-            'session_id' => $this->sessionId,
-            'client_id'  => $params['client_id'],
-            'params'     => [
-                'server_id'         => 1,
-                'type'              => 'mysql',
-                'database_name'     => $params['db_name'],
-                'database_user_id'  => 0,
-                'database_quota'    => 0,
-                'database_charset'  => 'utf8mb4',
-                'remote_access'     => 'n',
-                'active'            => 'y',
-            ],
-        ]);
-
-        // Crea anche l'utente DB
+        // Step 1: crea prima l'utente DB
         $userResponse = $this->post('sites_database_user_add', [
             'session_id' => $this->sessionId,
             'client_id'  => $params['client_id'],
             'params'     => [
-                'server_id'             => 1,
-                'database_user'         => $params['db_user'],
-                'database_password'     => $params['db_password'],
+                'server_id'         => 1,
+                'database_user'     => $params['db_user'],
+                'database_password' => $params['db_password'],
+            ],
+        ]);
+
+        $dbUserId = $userResponse['response'] ?? null;
+
+        if (! $dbUserId) {
+            throw new \RuntimeException(
+                "ISPConfig: impossibile creare l'utente DB {$params['db_user']}. " .
+                'Risposta: ' . json_encode($userResponse)
+            );
+        }
+
+        // Step 2: crea il DB assegnando l'utente appena creato
+        $response = $this->post('sites_database_add', [
+            'session_id' => $this->sessionId,
+            'client_id'  => $params['client_id'],
+            'params'     => [
+                'server_id'        => 1,
+                'type'             => 'mysql',
+                'database_name'    => $params['db_name'],
+                'database_user_id' => (int) $dbUserId,
+                'database_quota'   => 0,
+                'database_charset' => 'utf8mb4',
+                'remote_access'    => 'n',
+                'active'           => 'y',
             ],
         ]);
 
