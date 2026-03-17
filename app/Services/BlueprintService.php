@@ -101,9 +101,11 @@ class BlueprintService
     private function installPremiumPlugin(string $docroot, array $plugin, bool $activate): void
     {
         $zipPath = $plugin['zip_path'] ?? null;
+        $name    = $plugin['name'] ?? 'premium-plugin';
+        $slug    = \Str::slug($name); // es. "Varnish Manager" → "varnish-manager"
 
         if (! $zipPath) {
-            \Log::warning("BlueprintService: zip_path mancante per plugin premium '{$plugin['name']}'");
+            \Log::warning("BlueprintService: zip_path mancante per plugin premium '{$name}'");
             return;
         }
 
@@ -113,14 +115,59 @@ class BlueprintService
             throw new \RuntimeException("Plugin ZIP non trovato: {$zipFullPath}");
         }
 
-        // Copia in path temporanea accessibile
-        $tmpPath = '/tmp/plugin_premium_' . uniqid() . '.zip';
-        copy($zipFullPath, $tmpPath);
-        chmod($tmpPath, 0644);
+        // Crea uno ZIP temporaneo con la struttura corretta:
+        // plugin-slug/
+        //   └── file.php (o contenuto originale)
+        $tmpZip  = '/tmp/plugin_' . $slug . '_' . uniqid() . '.zip';
+        $tmpDir  = '/tmp/plugin_build_' . uniqid();
+        $plugDir = $tmpDir . '/' . $slug;
 
-        $this->wpCli->pluginInstall($docroot, $tmpPath, $activate);
+        mkdir($plugDir, 0755, true);
 
-        @unlink($tmpPath);
+        // Estrai lo ZIP originale nella cartella con il nome corretto
+        $zip = new \ZipArchive();
+        if ($zip->open($zipFullPath) === true) {
+            $zip->extractTo($plugDir);
+            $zip->close();
+        } else {
+            // Se non è uno ZIP valido, copialo direttamente come file PHP
+            copy($zipFullPath, $plugDir . '/' . $slug . '.php');
+    }
+
+        // Crea il nuovo ZIP con la struttura corretta
+        $newZip = new \ZipArchive();
+        $newZip->open($tmpZip, \ZipArchive::CREATE);
+
+        $files = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($tmpDir, \RecursiveDirectoryIterator::SKIP_DOTS)
+        );
+
+        foreach ($files as $file) {
+            $filePath   = $file->getRealPath();
+            $relativePath = substr($filePath, strlen($tmpDir) + 1);
+            $newZip->addFile($filePath, $relativePath);
+        }
+
+        $newZip->close();
+        chmod($tmpZip, 0644); // leggibile da web14
+
+        // Installa con WP-CLI
+        $this->wpCli->pluginInstall($docroot, $tmpZip, $activate);
+
+        // Pulizia
+        @unlink($tmpZip);
+        $this->rrmdir($tmpDir);
+    }
+
+    private function rrmdir(string $dir): void
+    {
+        if (! is_dir($dir)) return;
+        foreach (scandir($dir) as $item) {
+            if ($item === '.' || $item === '..') continue;
+            $path = $dir . '/' . $item;
+            is_dir($path) ? $this->rrmdir($path) : unlink($path);
+        }
+        rmdir($dir);
     }
 
     /**

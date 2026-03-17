@@ -76,26 +76,24 @@ class LocalConnection implements ServerConnection
 
     private function getOwner(string $path): ?string
     {
-        // Risale la gerarchia per trovare una directory esistente
-        while ($path && ! is_dir($path)) {
-            $path = dirname($path);
-        }
-
-        if (! $path || $path === '/') {
-            return null;
-        }
-
-        // Cerca sottodirectory accessibili per leggere il proprietario
-        foreach (scandir($path) ?: [] as $entry) {
+        // Risale la gerarchia per trovare una directory esistente e leggibile
+        while ($path && $path !== '/') {
+            if (is_dir($path)) {
+                $entries = @scandir($path);
+                if ($entries !== false) {
+                    foreach ($entries as $entry) {
             if ($entry === '.' || $entry === '..') continue;
-            $full = $path . '/' . $entry;
-            $stat = @stat($full);
+                        $stat = @stat($path . '/' . $entry);
             if ($stat) {
                 $info = posix_getpwuid($stat['uid']);
                 if ($info && $info['name'] !== 'root') {
                     return $info['name'];
                 }
             }
+        }
+                }
+            }
+            $path = dirname($path);
         }
 
         return null;
