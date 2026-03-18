@@ -35,6 +35,7 @@ class Site extends Model
         'logo_generated_at',
         'logo_batch_job',
         'logo_status',
+        'logo_aspect_ratio',
         'status',
         'current_step',
         'ssl_enabled',

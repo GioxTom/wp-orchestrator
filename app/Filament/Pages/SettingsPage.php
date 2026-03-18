@@ -26,10 +26,11 @@ class SettingsPage extends Page implements HasForms
     public function mount(): void
     {
         $this->form->fill([
-            'gemini_api_key'    => Setting::get('gemini_api_key') ? '••••••••' : '',
-            'gemini_model'      => Setting::get('gemini_model', 'gemini-3.1-flash-image-preview'),
-            'gemini_image_size' => Setting::get('gemini_image_size', '1K'),
-            'gemini_use_batch'  => Setting::get('gemini_use_batch', '0') === '1',
+            'gemini_api_key'         => Setting::get('gemini_api_key') ? '••••••••' : '',
+            'gemini_model'           => Setting::get('gemini_model', 'gemini-3.1-flash-image-preview'),
+            'gemini_image_size'      => Setting::get('gemini_image_size', '1K'),
+            'gemini_logo_aspect'     => Setting::get('gemini_logo_aspect', '1:1'),
+            'gemini_use_batch'       => Setting::get('gemini_use_batch', '0') === '1',
         ]);
     }
 
@@ -143,6 +144,18 @@ class SettingsPage extends Page implements HasForms
                             ->default('1K')
                             ->helperText('Flash supporta solo 1K. Pro supporta fino a 4K.'),
 
+                        Forms\Components\Select::make('gemini_logo_aspect')
+                            ->label('Aspect ratio logo (default)')
+                            ->options([
+                                '1:1'  => '1:1 — Quadrato',
+                                '3:4'  => '3:4 — Verticale',
+                                '4:3'  => '4:3 — Orizzontale',
+                                '16:9' => '16:9 — Widescreen',
+                                '9:16' => '9:16 — Verticale largo',
+                            ])
+                            ->default('1:1')
+                            ->helperText('Usato per la generazione del logo. Ogni sito può sovrascrivere questo valore.'),
+
                         Forms\Components\Toggle::make('gemini_use_batch')
                             ->label('Usa Batch API (−50% costo, asincrona)')
                             ->helperText('Turnaround tipico 2–10 minuti, max 24h.')
@@ -162,9 +175,10 @@ class SettingsPage extends Page implements HasForms
             Setting::set('gemini_api_key', $data['gemini_api_key'], true);
         }
 
-        Setting::set('gemini_model',      $data['gemini_model']      ?? 'gemini-3.1-flash-image-preview');
-        Setting::set('gemini_image_size', $data['gemini_image_size'] ?? '1K');
-        Setting::set('gemini_use_batch',  ($data['gemini_use_batch'] ?? false) ? '1' : '0');
+        Setting::set('gemini_model',        $data['gemini_model']        ?? 'gemini-3.1-flash-image-preview');
+        Setting::set('gemini_image_size',    $data['gemini_image_size']    ?? '1K');
+        Setting::set('gemini_logo_aspect',   $data['gemini_logo_aspect']   ?? '1:1');
+        Setting::set('gemini_use_batch',     ($data['gemini_use_batch']    ?? false) ? '1' : '0');
 
         Notification::make()
             ->title('Impostazioni salvate')

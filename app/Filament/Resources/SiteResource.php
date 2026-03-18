@@ -148,6 +148,18 @@ class SiteResource extends Resource
                             ]))
                         ->searchable()
                         ->helperText('⚙️ = prompt di sistema (default)  |  ✏️ = tuo override'),
+
+                    Forms\Components\Select::make('logo_aspect_ratio')
+                        ->label('Aspect ratio logo')
+                        ->options([
+                            '1:1'  => '1:1 — Quadrato',
+                            '3:4'  => '3:4 — Verticale',
+                            '4:3'  => '4:3 — Orizzontale',
+                            '16:9' => '16:9 — Widescreen',
+                            '9:16' => '9:16 — Verticale largo',
+                        ])
+                        ->default(fn () => \App\Models\Setting::get('gemini_logo_aspect', '1:1'))
+                        ->helperText('Sovrascrive il default globale nelle Impostazioni.'),
                 ])->columns(2),
         ]);
     }
@@ -428,17 +440,32 @@ class SiteResource extends Resource
                     ->label('Rigenera logo')
                     ->icon('heroicon-o-sparkles')
                     ->iconButton()
+                    ->tooltip('Rigenera logo')
                     ->color('info')
                     ->visible(fn (Site $record) => $record->isActive())
-                    ->action(function (Site $record) {
+                    ->form([
+                        Forms\Components\Select::make('logo_aspect_ratio')
+                            ->label('Aspect ratio logo')
+                            ->options([
+                                '1:1'  => '1:1 — Quadrato',
+                                '3:4'  => '3:4 — Verticale',
+                                '4:3'  => '4:3 — Orizzontale',
+                                '16:9' => '16:9 — Widescreen',
+                                '9:16' => '9:16 — Verticale largo',
+                            ])
+                            ->default(fn (Site $record) => $record->logo_aspect_ratio ?: \App\Models\Setting::get('gemini_logo_aspect', '1:1'))
+                            ->required(),
+                    ])
+                    ->action(function (Site $record, array $data) {
                         $record->update([
-                            'logo_status'    => 'none',
-                            'logo_batch_job' => null,
+                            'logo_status'       => 'none',
+                            'logo_batch_job'    => null,
+                            'logo_aspect_ratio' => $data['logo_aspect_ratio'],
                         ]);
-                        dispatch(new \App\Jobs\Provisioning\GenerateLogoJob($record));
+                        dispatch(new \App\Jobs\Provisioning\GenerateLogoJob($record->fresh()));
                         Notification::make()
                             ->title('Rigenerazione logo avviata')
-                            ->body(Setting::get('gemini_use_batch', '0') === '1'
+                            ->body(\App\Models\Setting::get('gemini_use_batch', '0') === '1'
                                 ? 'Modalità batch — pronto in 2–10 minuti.'
                                 : 'Modalità sincrona — pronto in ~60 secondi.')
                             ->success()

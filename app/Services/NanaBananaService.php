@@ -14,14 +14,25 @@ class NanaBananaService
     private string $apiKey;
     private string $model;
     private string $imageSize;
+    private string $defaultLogoAspect;
     private bool   $useBatch;
 
     public function __construct()
     {
-        $this->apiKey    = Setting::get('gemini_api_key', '');
-        $this->model     = Setting::get('gemini_model', 'gemini-3.1-flash-image-preview');
-        $this->imageSize = Setting::get('gemini_image_size', '1K');
-        $this->useBatch  = Setting::get('gemini_use_batch', '0') === '1';
+        $this->apiKey            = Setting::get('gemini_api_key', '');
+        $this->model             = Setting::get('gemini_model', 'gemini-3.1-flash-image-preview');
+        $this->imageSize         = Setting::get('gemini_image_size', '1K');
+        $this->defaultLogoAspect = Setting::get('gemini_logo_aspect', '1:1');
+        $this->useBatch          = Setting::get('gemini_use_batch', '0') === '1';
+    }
+
+    /**
+     * Restituisce l'aspect ratio da usare per il logo di un sito specifico.
+     * Usa il valore del sito se impostato, altrimenti il default globale.
+     */
+    private function logoAspect(Site $site): string
+    {
+        return $site->logo_aspect_ratio ?: $this->defaultLogoAspect;
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -64,7 +75,7 @@ class NanaBananaService
                 'generationConfig' => [
                     'responseModalities' => ['TEXT', 'IMAGE'],
                     'imageConfig' => [
-                        'aspectRatio' => '1:1',
+                        'aspectRatio' => $this->logoAspect($site),
                         'imageSize'   => $this->imageSize,
                     ],
                 ],
@@ -121,7 +132,7 @@ class NanaBananaService
                     ],
                     'generationConfig' => [
                         'responseModalities' => ['TEXT', 'IMAGE'],
-                        'imageConfig'        => ['aspectRatio' => '1:1', 'imageSize' => $this->imageSize],
+                        'imageConfig'        => ['aspectRatio' => $this->logoAspect($site), 'imageSize' => $this->imageSize],
                     ],
                 ],
             ]);
@@ -238,12 +249,12 @@ class NanaBananaService
             $wpCli      = new \App\Services\WpCliService($connection);
             $docroot    = $site->docroot;
 
-            // Copia il PNG in /tmp con permessi accessibili
+            // Copia il PNG in /tmp con permessi accessibili a web14
             $tmpPath    = '/tmp/logo-' . $site->id . '-' . uniqid() . '.png';
             copy($localPngPath, $tmpPath);
             chmod($tmpPath, 0644);
 
-            // Importa in WordPress media library via WP-CLI (con sudo -u)
+            // Importa in WordPress media library via WP-CLI (con sudo -u web14)
             $importOutput = $wpCli->run($docroot,
                 "media import " . escapeshellarg($tmpPath) .
                 " --title=" . escapeshellarg("{$site->site_name} Logo") .
