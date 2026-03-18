@@ -315,6 +315,269 @@ class BlueprintResource extends Resource
                         ->placeholder("<?php\n// Child theme functions\n// Placeholder: {site_name}, {domain}, {locale}\n")
                         ->helperText('Lascia vuoto per usare il template di default. Puoi usare {site_name}, {domain}, {locale} come placeholder.'),
                 ]),
+
+            // ── Pagine di default ─────────────────────────────────────────────
+            Forms\Components\Section::make('Pagine di default')
+                ->schema([
+                    Forms\Components\Repeater::make('pages')
+                        ->label('')
+                        ->schema([
+                            Forms\Components\TextInput::make('title')
+                                ->label('Titolo')
+                                ->required()
+                                ->columnSpan(2),
+
+                            Forms\Components\TextInput::make('slug')
+                                ->label('Slug')
+                                ->placeholder('es. chi-siamo')
+                                ->helperText('Lascia vuoto per generarlo dal titolo automaticamente.')
+                                ->columnSpan(2),
+
+                            Forms\Components\TextInput::make('template')
+                                ->label('Template')
+                                ->placeholder('default')
+                                ->helperText('Nome file del template del tema (es. full-width). Lascia vuoto per il default.')
+                                ->columnSpan(2),
+
+                            Forms\Components\RichEditor::make('content')
+                                ->label('Contenuto')
+                                ->columnSpanFull()
+                                ->toolbarButtons([
+                                    'bold', 'italic', 'underline', 'strike',
+                                    'h2', 'h3',
+                                    'bulletList', 'orderedList',
+                                    'link', 'blockquote',
+                                    'undo', 'redo',
+                                ]),
+                        ])
+                        ->columns(6)
+                        ->addActionLabel('Aggiungi pagina')
+                        ->reorderable()
+                        ->collapsible()
+                        ->itemLabel(fn (array $state) => $state['title'] ?? 'Nuova pagina'),
+                ]),
+
+            // ── Menu di default ───────────────────────────────────────────────
+            Forms\Components\Section::make('Menu di default')
+                ->schema([
+                    // Guida posizioni menu
+                    Forms\Components\Section::make('📖 Come trovare le posizioni menu del tema')
+                        ->collapsed()
+                        ->schema([
+                            Forms\Components\Placeholder::make('menu_guide')
+                                ->label('')
+                                ->content(new HtmlString('
+<div class="space-y-4 text-sm">
+    <div>
+        <h4 class="font-semibold mb-1">Dove trovare le posizioni disponibili</h4>
+        <p>Ogni tema WordPress registra le proprie posizioni menu. Per trovarle:</p>
+        <ol class="list-decimal ml-4 mt-2 space-y-1">
+            <li>Installa il tema sul sito</li>
+            <li>Vai in <strong>Aspetto → Menu</strong></li>
+            <li>Scorri in basso fino alla sezione <strong>"Posizioni tema"</strong></li>
+            <li>Le posizioni disponibili sono elencate lì con il loro nome visibile</li>
+        </ol>
+    </div>
+    <div>
+        <h4 class="font-semibold mb-1">Come ottenere il nome tecnico (slug)</h4>
+        <p>Il nome tecnico si trova nel file <strong>functions.php</strong> del tema, nella funzione <code>register_nav_menus()</code>:</p>
+        <pre class="mt-1 text-xs bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded overflow-x-auto">register_nav_menus([
+    \'primary\'  => \'Menu principale\',   ← usa: primary
+    \'footer\'   => \'Menu footer\',       ← usa: footer
+    \'social\'   => \'Link social\',       ← usa: social
+]);</pre>
+    </div>
+    <div>
+        <h4 class="font-semibold mb-1">Posizioni comuni per tema</h4>
+        <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+            <table class="w-full text-xs">
+                <thead class="bg-gray-100 dark:bg-gray-800">
+                    <tr>
+                        <th class="px-3 py-2 text-left">Tema</th>
+                        <th class="px-3 py-2 text-left">Posizioni disponibili</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    <tr><td class="px-3 py-2">GeneratePress</td><td class="px-3 py-2 font-mono">primary, secondary, mobile-menu, footer-bar</td></tr>
+                    <tr><td class="px-3 py-2">Astra</td><td class="px-3 py-2 font-mono">primary, footer-menu</td></tr>
+                    <tr><td class="px-3 py-2">OceanWP</td><td class="px-3 py-2 font-mono">main_nav, mobile_nav, footer_nav, top_bar_menu</td></tr>
+                    <tr><td class="px-3 py-2">Hello Elementor</td><td class="px-3 py-2 font-mono">menu-1</td></tr>
+                    <tr><td class="px-3 py-2">Neve</td><td class="px-3 py-2 font-mono">primary, footer</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+                                ')),
+                        ]),
+
+                    Forms\Components\Repeater::make('menus')
+                        ->label('')
+                        ->schema([
+                            Forms\Components\TextInput::make('name')
+                                ->label('Nome menu')
+                                ->placeholder('es. Menu principale')
+                                ->required()
+                                ->columnSpan(2),
+
+                            Forms\Components\TextInput::make('location')
+                                ->label('Posizione tema')
+                                ->placeholder('es. primary')
+                                ->helperText('Slug della posizione (vedi guida sopra)')
+                                ->required()
+                                ->columnSpan(2),
+
+                            Forms\Components\Repeater::make('items')
+                                ->label('Voci menu')
+                                ->schema([
+                                    Forms\Components\TextInput::make('label')
+                                        ->label('Etichetta')
+                                        ->required()
+                                        ->columnSpan(2),
+
+                                    Forms\Components\Select::make('type')
+                                        ->label('Tipo')
+                                        ->options([
+                                            'page'   => 'Pagina blueprint',
+                                            'custom' => 'URL personalizzato',
+                                            'home'   => 'Homepage',
+                                        ])
+                                        ->default('page')
+                                        ->live()
+                                        ->required()
+                                        ->columnSpan(1),
+
+                                    Forms\Components\TextInput::make('page_slug')
+                                        ->label('Slug pagina')
+                                        ->placeholder('es. chi-siamo')
+                                        ->visible(fn (Get $get) => $get('type') === 'page')
+                                        ->columnSpan(2),
+
+                                    Forms\Components\TextInput::make('url')
+                                        ->label('URL')
+                                        ->placeholder('https://')
+                                        ->visible(fn (Get $get) => $get('type') === 'custom')
+                                        ->columnSpan(2),
+
+                                    Forms\Components\TextInput::make('order')
+                                        ->label('Ordine')
+                                        ->numeric()
+                                        ->default(1)
+                                        ->columnSpan(1),
+                                ])
+                                ->columns(6)
+                                ->addActionLabel('Aggiungi voce')
+                                ->collapsible()
+                                ->itemLabel(fn (array $state) => $state['label'] ?? 'Voce')
+                                ->columnSpanFull(),
+                        ])
+                        ->columns(4)
+                        ->addActionLabel('Aggiungi menu')
+                        ->reorderable()
+                        ->collapsible()
+                        ->itemLabel(fn (array $state) => ($state['name'] ?? '') . ($state['location'] ? ' → ' . $state['location'] : '')),
+                ]),
+
+            // ── Widget di default ─────────────────────────────────────────────
+            Forms\Components\Section::make('Widget di default')
+                ->schema([
+                    // Guida widget
+                    Forms\Components\Section::make('📖 Come trovare sidebar e widget disponibili')
+                        ->collapsed()
+                        ->schema([
+                            Forms\Components\Placeholder::make('widget_guide')
+                                ->label('')
+                                ->content(new HtmlString('
+<div class="space-y-4 text-sm">
+    <div>
+        <h4 class="font-semibold mb-1">Trovare le sidebar disponibili</h4>
+        <p>Ogni tema registra le proprie sidebar (aree widget). Per trovarle:</p>
+        <ol class="list-decimal ml-4 mt-2 space-y-1">
+            <li>Installa il tema sul sito</li>
+            <li>Vai in <strong>Aspetto → Widget</strong></li>
+            <li>Le sezioni elencate (es. "Sidebar principale", "Footer 1") sono le sidebar disponibili</li>
+        </ol>
+        <p class="mt-2">Il <strong>sidebar_id</strong> si trova nel functions.php del tema, nella funzione <code>register_sidebar()</code>:</p>
+        <pre class="mt-1 text-xs bg-gray-100 dark:bg-gray-800 px-3 py-2 rounded overflow-x-auto">register_sidebar([
+    \'id\'   => \'sidebar-1\',    ← usa questo come sidebar_id
+    \'name\' => \'Sidebar principale\',
+]);</pre>
+    </div>
+    <div>
+        <h4 class="font-semibold mb-1">Widget WordPress standard</h4>
+        <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+            <table class="w-full text-xs">
+                <thead class="bg-gray-100 dark:bg-gray-800">
+                    <tr>
+                        <th class="px-3 py-2 text-left">Widget</th>
+                        <th class="px-3 py-2 text-left">widget_type</th>
+                        <th class="px-3 py-2 text-left">Impostazioni principali</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    <tr><td class="px-3 py-2">Testo</td><td class="px-3 py-2 font-mono">text</td><td class="px-3 py-2 font-mono">title, text</td></tr>
+                    <tr><td class="px-3 py-2">Post recenti</td><td class="px-3 py-2 font-mono">recent-posts</td><td class="px-3 py-2 font-mono">title, number</td></tr>
+                    <tr><td class="px-3 py-2">Categorie</td><td class="px-3 py-2 font-mono">categories</td><td class="px-3 py-2 font-mono">title, count, dropdown</td></tr>
+                    <tr><td class="px-3 py-2">Archivi</td><td class="px-3 py-2 font-mono">archives</td><td class="px-3 py-2 font-mono">title, count, dropdown</td></tr>
+                    <tr><td class="px-3 py-2">Ricerca</td><td class="px-3 py-2 font-mono">search</td><td class="px-3 py-2 font-mono">title</td></tr>
+                    <tr><td class="px-3 py-2">Tag cloud</td><td class="px-3 py-2 font-mono">tag_cloud</td><td class="px-3 py-2 font-mono">title, taxonomy</td></tr>
+                    <tr><td class="px-3 py-2">Commenti recenti</td><td class="px-3 py-2 font-mono">recent-comments</td><td class="px-3 py-2 font-mono">title, number</td></tr>
+                    <tr><td class="px-3 py-2">RSS</td><td class="px-3 py-2 font-mono">rss</td><td class="px-3 py-2 font-mono">title, url, items</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div>
+        <h4 class="font-semibold mb-1">Sidebar comuni per tema</h4>
+        <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+            <table class="w-full text-xs">
+                <thead class="bg-gray-100 dark:bg-gray-800">
+                    <tr>
+                        <th class="px-3 py-2 text-left">Tema</th>
+                        <th class="px-3 py-2 text-left">Sidebar ID</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    <tr><td class="px-3 py-2">GeneratePress</td><td class="px-3 py-2 font-mono">sidebar, footer-1, footer-2, footer-3</td></tr>
+                    <tr><td class="px-3 py-2">Astra</td><td class="px-3 py-2 font-mono">sidebar-1, sidebar-2</td></tr>
+                    <tr><td class="px-3 py-2">OceanWP</td><td class="px-3 py-2 font-mono">sidebar, footer-1, footer-2, footer-3, footer-4</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+                                ')),
+                        ]),
+
+                    Forms\Components\Repeater::make('widgets')
+                        ->label('')
+                        ->schema([
+                            Forms\Components\TextInput::make('sidebar_id')
+                                ->label('Sidebar ID')
+                                ->placeholder('es. sidebar-1')
+                                ->helperText('Vedi guida sopra')
+                                ->required()
+                                ->columnSpan(2),
+
+                            Forms\Components\TextInput::make('widget_type')
+                                ->label('Tipo widget')
+                                ->placeholder('es. text')
+                                ->helperText('Vedi tabella nella guida')
+                                ->required()
+                                ->columnSpan(2),
+
+                            Forms\Components\KeyValue::make('settings')
+                                ->label('Impostazioni')
+                                ->keyLabel('Chiave')
+                                ->valueLabel('Valore')
+                                ->columnSpanFull(),
+                        ])
+                        ->columns(4)
+                        ->addActionLabel('Aggiungi widget')
+                        ->reorderable()
+                        ->collapsible()
+                        ->itemLabel(fn (array $state) => ($state['widget_type'] ?? '') . ($state['sidebar_id'] ? ' → ' . $state['sidebar_id'] : '')),
+                ]),
         ]);
     }
 

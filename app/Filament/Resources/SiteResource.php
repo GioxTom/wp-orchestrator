@@ -84,8 +84,20 @@ class SiteResource extends Resource
                     Forms\Components\TextInput::make('domain')
                         ->label('Dominio')
                         ->placeholder('esempio.com')
+                        ->helperText('Inserisci il dominio senza www')
                         ->required()
                         ->unique(ignoreRecord: true),
+
+                    Forms\Components\Radio::make('www_mode')
+                        ->label('URL principale')
+                        ->options([
+                            'www'    => 'www.esempio.com  (consigliato)',
+                            'no-www' => 'esempio.com',
+                        ])
+                        ->default('www')
+                        ->inline()
+                        ->columnSpanFull()
+                        ->required(),
 
                     Forms\Components\TextInput::make('site_name')
                         ->label('Nome del sito')
