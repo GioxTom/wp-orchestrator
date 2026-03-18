@@ -641,13 +641,57 @@ class BlueprintResource extends Resource
                 Tables\Columns\TextColumn::make('updated_at')->label('Aggiornato')->since(),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\ReplicateAction::make()
-                    ->label('Duplica')
-                    ->beforeReplicaSaved(function (Blueprint $replica) {
-                        $replica->name   = $replica->name . ' (copia)';
-                        $replica->slug   = $replica->slug . '-copy-' . uniqid();
-                        $replica->status = 'draft';
+                Tables\Actions\EditAction::make()
+                    ->iconButton()
+                    ->tooltip('Modifica'),
+
+                Tables\Actions\Action::make('clone')
+                    ->label('Clona')
+                    ->icon('heroicon-o-document-duplicate')
+                    ->iconButton()
+                    ->tooltip('Clona blueprint con tutti i file')
+                    ->color('gray')
+                    ->requiresConfirmation()
+                    ->modalHeading(fn (Blueprint $record) => 'Clonare "' . $record->name . '"?')
+                    ->modalDescription('Verrà creata una copia completa del blueprint inclusi tema ZIP e plugin premium.')
+                    ->modalSubmitActionLabel('Clona')
+                    ->action(function (Blueprint $record) {
+                        // Clona il record
+                        $clone = $record->replicate();
+                        $clone->name   = $record->name . ' (copia)';
+                        $clone->slug   = $record->slug . '-clone-' . substr(uniqid(), -6);
+                        $clone->status = 'draft';
+
+                        // Copia il file ZIP del tema se presente
+                        if ($record->zip_path && \Storage::disk('local')->exists($record->zip_path)) {
+                            $ext      = pathinfo($record->zip_path, PATHINFO_EXTENSION);
+                            $newPath  = 'blueprints/clone_' . uniqid() . '.' . $ext;
+                            \Storage::disk('local')->copy($record->zip_path, $newPath);
+                            $clone->zip_path = $newPath;
+                        }
+
+                        // Copia i file ZIP dei plugin premium
+                        $pluginList = $record->plugin_list ?? [];
+                        foreach ($pluginList as &$plugin) {
+                            if (! empty($plugin['is_premium']) && ! empty($plugin['zip_path'])) {
+                                if (\Storage::disk('local')->exists($plugin['zip_path'])) {
+                                    $ext     = pathinfo($plugin['zip_path'], PATHINFO_EXTENSION);
+                                    $newPath = 'blueprints/plugins/clone_' . uniqid() . '.' . $ext;
+                                    \Storage::disk('local')->copy($plugin['zip_path'], $newPath);
+                                    $plugin['zip_path'] = $newPath;
+                                }
+                            }
+                        }
+                        unset($plugin);
+                        $clone->plugin_list = $pluginList;
+
+                        $clone->save();
+
+                        \Filament\Notifications\Notification::make()
+                            ->title('Blueprint clonato')
+                            ->body('"' . $clone->name . '" è pronto in bozza.')
+                            ->success()
+                            ->send();
                     }),
             ]);
     }
