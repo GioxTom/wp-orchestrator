@@ -53,7 +53,7 @@ class NanaBananaService
                 'Content-Type'   => 'application/json',
             ])
             ->timeout(120)
-            ->post(self::API_BASE . '/models/' . \$this->model . ':generateContent', [
+            ->post(self::API_BASE . '/models/' . $this->model . ':generateContent', [
                 'contents' => [
                     [
                         'parts' => [
@@ -152,7 +152,7 @@ class NanaBananaService
             ])
             ->timeout(30)
             ->post(self::API_BASE . '/batches', [
-                'model'        => 'models/' . \$this->model,
+                'model'        => 'models/' . $this->model,
                 'src'          => ['fileUri' => $fileUri],
                 'dest'         => [],  // output gestito internamente da Gemini
             ]);
