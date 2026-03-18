@@ -244,10 +244,23 @@ class SiteResource extends Resource
                     ->relationship('server', 'name'),
             ])
             ->actions([
+                // Mostra credenziali WordPress
+                Tables\Actions\Action::make('credentials')
+                    ->icon('heroicon-o-key')
+                    ->iconButton()
+                    ->tooltip('Credenziali WordPress')
+                    ->color('success')
+                    ->visible(fn (Site $record) => $record->isActive())
+                    ->modalHeading(fn (Site $record) => 'Credenziali — ' . $record->domain)
+                    ->modalContent(fn (Site $record) => view('filament.modals.wp-credentials', ['site' => $record]))
+                    ->modalSubmitAction(false)
+                    ->modalCancelActionLabel('Chiudi'),
+
                 // Riprova provisioning dopo un errore
                 Tables\Actions\Action::make('retry')
                     ->label('Riprova')
                     ->icon('heroicon-o-arrow-path')
+                    ->iconButton()
                     ->color('warning')
                     ->visible(fn (Site $record) => $record->status === 'error')
                     ->requiresConfirmation()
@@ -283,10 +296,57 @@ class SiteResource extends Resource
                             ->send();
                     }),
 
+                // Reset e riapplica pagine blueprint
+                Tables\Actions\Action::make('reset_pages')
+                    ->label('Reset pagine')
+                    ->icon('heroicon-o-document-duplicate')
+                    ->iconButton()
+                    ->color('warning')
+                    ->visible(fn (Site $record) => $record->isActive() && $record->blueprint_id)
+                    ->requiresConfirmation()
+                    ->modalHeading('Resettare le pagine del blueprint?')
+                    ->modalDescription('Le pagine con gli stessi slug del blueprint verranno eliminate e ricreate.')
+                    ->modalSubmitActionLabel('Sì, resetta pagine')
+                    ->action(function (Site $record) {
+                        $connection = $record->server->connection();
+                        $wpCli      = new \App\Services\WpCliService($connection);
+                        $service    = new \App\Services\BlueprintService($wpCli);
+                        $service->resetAndApplyPages($record, $record->blueprint);
+
+                        Notification::make()
+                            ->title('Pagine ripristinate')
+                            ->success()
+                            ->send();
+                    }),
+
+                // Reset e riapplica widget blueprint
+                Tables\Actions\Action::make('reset_widgets')
+                    ->label('Reset widget')
+                    ->icon('heroicon-o-squares-2x2')
+                    ->iconButton()
+                    ->color('warning')
+                    ->visible(fn (Site $record) => $record->isActive() && $record->blueprint_id)
+                    ->requiresConfirmation()
+                    ->modalHeading('Resettare i widget del blueprint?')
+                    ->modalDescription('I widget nelle sidebar del blueprint verranno rimossi e ricreati.')
+                    ->modalSubmitActionLabel('Sì, resetta widget')
+                    ->action(function (Site $record) {
+                        $connection = $record->server->connection();
+                        $wpCli      = new \App\Services\WpCliService($connection);
+                        $service    = new \App\Services\BlueprintService($wpCli);
+                        $service->resetAndApplyWidgets($record, $record->blueprint);
+
+                        Notification::make()
+                            ->title('Widget ripristinati')
+                            ->success()
+                            ->send();
+                    }),
+
                 // Visualizza log provisioning
                 Tables\Actions\Action::make('logs')
                     ->label('Log')
                     ->icon('heroicon-o-document-text')
+                    ->iconButton()
                     ->color('gray')
                     ->url(fn (Site $record) => route('filament.admin.resources.sites.logs', $record)),
 
@@ -294,6 +354,7 @@ class SiteResource extends Resource
                 Tables\Actions\Action::make('reset_password')
                     ->label('Reset password admin')
                     ->icon('heroicon-o-key')
+                    ->iconButton()
                     ->color('warning')
                     ->requiresConfirmation()
                     ->visible(fn (Site $record) => $record->isActive())
@@ -318,6 +379,7 @@ class SiteResource extends Resource
                 Tables\Actions\Action::make('confirm_blueprint')
                     ->label('Applica blueprint')
                     ->icon('heroicon-o-puzzle-piece')
+                    ->iconButton()
                     ->color('warning')
                     ->visible(fn (Site $record) => $record->status === 'import_blueprint_pending')
                     ->requiresConfirmation()
@@ -345,6 +407,7 @@ class SiteResource extends Resource
                 Tables\Actions\Action::make('skip_blueprint')
                     ->label('Salta blueprint')
                     ->icon('heroicon-o-forward')
+                    ->iconButton()
                     ->color('gray')
                     ->visible(fn (Site $record) => $record->status === 'import_blueprint_pending')
                     ->requiresConfirmation()
@@ -364,6 +427,7 @@ class SiteResource extends Resource
                 Tables\Actions\Action::make('regenerate_logo')
                     ->label('Rigenera logo')
                     ->icon('heroicon-o-sparkles')
+                    ->iconButton()
                     ->color('info')
                     ->visible(fn (Site $record) => $record->isActive())
                     ->action(function (Site $record) {
@@ -383,6 +447,7 @@ class SiteResource extends Resource
                 Tables\Actions\Action::make('purge_varnish')
                     ->label('Purge Varnish')
                     ->icon('heroicon-o-arrow-path')
+                    ->iconButton()
                     ->color('info')
                     ->visible(fn (Site $record) => $record->isActive())
                     ->action(function (Site $record) {
@@ -399,6 +464,7 @@ class SiteResource extends Resource
                 Tables\Actions\Action::make('disable')
                     ->label('Disabilita')
                     ->icon('heroicon-o-pause-circle')
+                    ->iconButton()
                     ->color('danger')
                     ->requiresConfirmation()
                     ->visible(fn (Site $record) => $record->status === 'active')
@@ -413,6 +479,7 @@ class SiteResource extends Resource
                 Tables\Actions\Action::make('enable')
                     ->label('Abilita')
                     ->icon('heroicon-o-play-circle')
+                    ->iconButton()
                     ->color('success')
                     ->visible(fn (Site $record) => $record->status === 'disabled')
                     ->action(function (Site $record) {
