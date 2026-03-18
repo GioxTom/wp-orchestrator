@@ -135,9 +135,24 @@ class BlueprintService
 
     /**
      * Aggiunge i widget alle sidebar definite nel blueprint.
+     * Prima svuota tutte le sidebar WordPress.
      */
     public function createWidgets(string $docroot, array $widgets): void
     {
+        if (empty($widgets)) {
+            return;
+        }
+
+        // Svuota tutte le sidebar prima di aggiungere i widget del blueprint
+        try {
+            $output = $this->wpCli->run($docroot, "sidebar list --fields=id --format=ids");
+            $allSidebars = array_filter(explode(' ', trim($output)));
+            foreach ($allSidebars as $sidebarId) {
+                $this->wpCli->resetSidebar($docroot, trim($sidebarId));
+            }
+        } catch (\Throwable) {
+            // Non bloccante — procede con l'aggiunta
+        }
         $position = 1;
         $currentSidebar = null;
 
@@ -189,17 +204,19 @@ class BlueprintService
     {
         $docroot = $site->docroot;
 
-        // Svuota le sidebar coinvolte nel blueprint
-        $sidebars = collect($blueprint->widgets ?? [])
-            ->pluck('sidebar_id')
-            ->unique()
-            ->filter();
+        // Recupera tutte le sidebar registrate in WordPress e le svuota
+        try {
+            $output = $this->wpCli->run($docroot, "sidebar list --fields=id --format=ids");
+            $allSidebars = array_filter(explode(' ', trim($output)));
 
-        foreach ($sidebars as $sidebarId) {
-            $this->wpCli->resetSidebar($docroot, $sidebarId);
+            foreach ($allSidebars as $sidebarId) {
+                $this->wpCli->resetSidebar($docroot, trim($sidebarId));
+        }
+        } catch (\Throwable $e) {
+            \Log::warning("BlueprintService: impossibile recuperare sidebar WP — " . $e->getMessage());
         }
 
-        // Riaggiunge i widget
+        // Riaggiunge i widget del blueprint
         $this->createWidgets($docroot, $blueprint->widgets ?? []);
     }
 
