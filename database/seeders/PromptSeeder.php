@@ -32,6 +32,33 @@ Design requirements:
 Return only the logo image, square format (1:1), no additional text or explanation.
 PROMPT,
             ],
+
+            [
+                'name'    => 'Category Generation — Default',
+                'slug'    => 'category-generation-default',
+                'action'  => 'category_generation',
+                'type'    => 'system',
+                'content' => <<<'PROMPT'
+Sei un esperto di content strategy e SEO per siti web.
+
+Genera esattamente {count} categorie WordPress per il seguente sito web:
+
+Nome sito: {site_name}
+Descrizione: {description}
+Lingua: {lang}
+
+Requisiti:
+- Le categorie devono essere pertinenti al tema del sito
+- Devono essere scritte nella lingua indicata ({lang})
+- Devono essere concise (1-3 parole ciascuna)
+- Devono essere uniche e non sovrapporsi tra loro
+- Devono coprire i principali argomenti del sito
+- Non includere "Generale" o "Varie" come categorie
+
+Rispondi ESCLUSIVAMENTE con un array JSON di stringhe, senza nessun testo aggiuntivo, senza backtick, senza spiegazioni.
+Esempio di risposta corretta: ["Tecnologia", "Sport", "Cultura", "Economia"]
+PROMPT,
+            ],
         ];
 
         foreach ($systemPrompts as $data) {
