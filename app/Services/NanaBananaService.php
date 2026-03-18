@@ -112,7 +112,7 @@ class NanaBananaService
         }
 
         try {
-            // Prepara il file JSONL con la singola richiesta
+            // JSONL corretto: {"key": "...", "request": {GenerateContentRequest}}
             $requestLine = json_encode([
                 'key'     => "site_{$site->id}_logo",
                 'request' => [
@@ -121,19 +121,30 @@ class NanaBananaService
                     ],
                     'generationConfig' => [
                         'responseModalities' => ['TEXT', 'IMAGE'],
-                        'imageConfig' => ['aspectRatio' => '1:1', 'imageSize' => $this->imageSize],
+                        'imageConfig'        => ['aspectRatio' => '1:1', 'imageSize' => $this->imageSize],
                     ],
                 ],
             ]);
 
-            // Step 1: Upload del file JSONL tramite Files API
+            // Step 1: Upload del file JSONL tramite Files API (multipart)
+            // La Files API richiede multipart/form-data con metadata + file
+            $boundary = 'batch_' . uniqid();
+
+            $body  = "--{$boundary}\r\n";
+            $body .= "Content-Type: application/json; charset=utf-8\r\n\r\n";
+            $body .= json_encode(['mimeType' => 'application/jsonl']) . "\r\n";
+            $body .= "--{$boundary}\r\n";
+            $body .= "Content-Type: application/jsonl\r\n\r\n";
+            $body .= $requestLine . "\r\n";
+            $body .= "--{$boundary}--";
+
             $uploadResponse = Http::withHeaders([
                 'x-goog-api-key' => $this->apiKey,
-                'Content-Type'   => 'text/plain', // JSONL
+                'Content-Type'   => "multipart/related; boundary={$boundary}",
             ])
             ->timeout(30)
-            ->withBody($requestLine, 'text/plain')
-            ->post(self::API_BASE . '/files');
+            ->withBody($body, "multipart/related; boundary={$boundary}")
+            ->post('https://generativelanguage.googleapis.com/upload/v1beta/files');
 
             if ($uploadResponse->failed()) {
                 Log::error("NanaBananaService: upload JSONL fallito", [
@@ -143,18 +154,17 @@ class NanaBananaService
                 return null;
             }
 
-            $fileUri = $uploadResponse->json('file.uri');
+            $fileName = $uploadResponse->json('file.name'); // es. "files/abc123"
 
-            // Step 2: Crea il batch job
+            // Step 2: Crea il batch job usando il file appena caricato
             $batchResponse = Http::withHeaders([
                 'x-goog-api-key' => $this->apiKey,
                 'Content-Type'   => 'application/json',
             ])
             ->timeout(30)
             ->post(self::API_BASE . '/batches', [
-                'model'        => 'models/' . $this->model,
-                'src'          => ['fileUri' => $fileUri],
-                'dest'         => [],  // output gestito internamente da Gemini
+                'model'  => 'models/' . $this->model,
+                'src'    => ['file' => $fileName],
             ]);
 
             if ($batchResponse->failed()) {
@@ -225,42 +235,40 @@ class NanaBananaService
 
         try {
             $connection = $site->server->connection();
+            $wpCli      = new \App\Services\WpCliService($connection);
             $docroot    = $site->docroot;
 
-            // Copia il PNG nel server (locale: stessa cosa, SSH: upload)
-            $remoteTemp = "{$docroot}/wp-content/uploads/logo-{$site->id}-" . uniqid() . '.png';
-            $connection->upload($localPngPath, $remoteTemp);
+            // Copia il PNG in /tmp con permessi accessibili
+            $tmpPath    = '/tmp/logo-' . $site->id . '-' . uniqid() . '.png';
+            copy($localPngPath, $tmpPath);
+            chmod($tmpPath, 0644);
 
-            // Importa in WordPress media library
-            $connection->run(
-                "wp --path={$docroot} media import {$remoteTemp} " .
-                "--title=" . escapeshellarg("{$site->site_name} Logo") .
-                " --allow-root 2>&1"
+            // Importa in WordPress media library via WP-CLI (con sudo -u)
+            $importOutput = $wpCli->run($docroot,
+                "media import " . escapeshellarg($tmpPath) .
+                " --title=" . escapeshellarg("{$site->site_name} Logo") .
+                " --porcelain"
             );
 
-            // Recupera l'ID attachment appena importato
-            $attachmentId = trim($connection->run(
-                "wp --path={$docroot} post list --post_type=attachment " .
-                "--posts_per_page=1 --orderby=date --order=DESC --field=ID --allow-root 2>&1"
-            ));
+            $attachmentId = (int) trim($importOutput);
 
-            if (is_numeric($attachmentId)) {
-                // Recupera il tema attivo e imposta custom_logo
-                $themeSlug = trim($connection->run(
-                    "wp --path={$docroot} theme list --status=active --field=name --allow-root 2>&1"
+            if ($attachmentId > 0) {
+                // Recupera il tema attivo
+                $themeSlug = trim($wpCli->run($docroot,
+                    "theme list --status=active --field=name"
                 ));
 
-                $connection->run(
-                    "wp --path={$docroot} option update theme_mods_{$themeSlug} " .
-                    escapeshellarg(json_encode(['custom_logo' => (int) $attachmentId])) .
-                    " --format=json --allow-root 2>&1"
+                // Imposta custom_logo nelle opzioni del tema
+                $wpCli->run($docroot,
+                    "option update theme_mods_{$themeSlug} " .
+                    escapeshellarg(json_encode(['custom_logo' => $attachmentId])) .
+                    " --format=json"
                 );
 
                 Log::info("NanaBananaService: logo applicato (attachment #{$attachmentId}) per site #{$site->id}");
             }
 
-            // Pulizia file temporanei
-            $connection->run("rm -f {$remoteTemp}");
+            @unlink($tmpPath);
             @unlink($localPngPath);
 
             return true;
