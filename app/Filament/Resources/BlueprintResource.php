@@ -656,8 +656,8 @@ class BlueprintResource extends Resource
                     ->modalDescription('Verrà creata una copia completa del blueprint inclusi tema ZIP e plugin premium.')
                     ->modalSubmitActionLabel('Clona')
                     ->action(function (Blueprint $record) {
-                        // Clona il record
-                        $clone = $record->replicate();
+                        // Clona il record escludendo attributi calcolati
+                        $clone = $record->replicate(['sites_count']);
                         $clone->name   = $record->name . ' (copia)';
                         $clone->slug   = $record->slug . '-clone-' . substr(uniqid(), -6);
                         $clone->status = 'draft';
