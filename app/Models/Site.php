@@ -19,6 +19,7 @@ class Site extends Model
         'prompt_id',
         'php_version_id',
         'domain',
+        'www_mode',
         'site_name',
         'description',
         'locale',
