@@ -15,7 +15,7 @@ class BlueprintService
 
     /**
      * Applica un blueprint completo a un sito WordPress già installato.
-     * Ordine: tema parent → plugin → child theme → impostazioni WP.
+     * Ordine: tema parent → plugin → child theme → impostazioni WP → pagine → menu → widget.
      */
     public function apply(Site $site, Blueprint $blueprint): void
     {
@@ -39,6 +39,168 @@ class BlueprintService
         if (! empty($blueprint->wp_settings)) {
             $this->applyWpSettings($docroot, $blueprint->wp_settings);
         }
+
+        // 5. Crea le pagine di default
+        if (! empty($blueprint->pages)) {
+            $this->createPages($docroot, $blueprint->pages);
+    }
+
+        // 6. Crea i menu e li assegna alle posizioni
+        if (! empty($blueprint->menus)) {
+            $this->createMenus($docroot, $blueprint->menus);
+        }
+
+        // 7. Aggiunge i widget alle sidebar
+        if (! empty($blueprint->widgets)) {
+            $this->createWidgets($docroot, $blueprint->widgets);
+        }
+    }
+
+    /**
+     * Crea le pagine definite nel blueprint.
+     * Restituisce mappa slug → page_id per uso nei menu.
+     */
+    public function createPages(string $docroot, array $pages): array
+    {
+        $pageIds = [];
+
+        foreach ($pages as $page) {
+            $title    = $page['title']    ?? 'Pagina';
+            $slug     = $page['slug']     ?? Str::slug($title);
+            $template = $page['template'] ?? '';
+            $content  = $page['content']  ?? '';
+
+            try {
+                $id = $this->wpCli->createPage($docroot, $title, $slug, $content, $template);
+                if ($id > 0) {
+                    $pageIds[$slug] = $id;
+                }
+            } catch (\Throwable $e) {
+                \Log::warning("BlueprintService: errore creazione pagina '{$title}': " . $e->getMessage());
+            }
+        }
+
+        return $pageIds;
+    }
+
+    /**
+     * Crea i menu e li assegna alle posizioni del tema.
+     */
+    public function createMenus(string $docroot, array $menus): void
+    {
+        foreach ($menus as $menu) {
+            $name     = $menu['name']     ?? 'Menu';
+            $location = $menu['location'] ?? '';
+            $items    = $menu['items']    ?? [];
+
+            try {
+                $menuId = $this->wpCli->createMenu($docroot, $name);
+
+                // Aggiunge le voci al menu
+                foreach ($items as $item) {
+                    $type     = $item['type']      ?? 'custom';
+                    $label    = $item['label']     ?? '';
+                    $order    = (int) ($item['order'] ?? 1);
+
+                    if ($type === 'page' && ! empty($item['page_slug'])) {
+                        // Cerca l'ID della pagina per slug
+                        try {
+                            $output = $this->wpCli->run($docroot,
+                                "post list --post_type=page --post_name={$item['page_slug']} --fields=ID --format=ids"
+                            );
+                            $pageId = (int) trim($output);
+                            if ($pageId > 0) {
+                                $this->wpCli->addMenuItemPage($docroot, (string) $menuId, $pageId, $label, $order);
+                            }
+                        } catch (\Throwable) {}
+
+                    } elseif ($type === 'home') {
+                        $this->wpCli->addMenuItemCustom($docroot, (string) $menuId, '/', $label ?: 'Home', $order);
+
+                    } elseif ($type === 'custom' && ! empty($item['url'])) {
+                        $this->wpCli->addMenuItemCustom($docroot, (string) $menuId, $item['url'], $label, $order);
+                    }
+                }
+
+                // Assegna il menu alla posizione del tema
+                if ($location) {
+                    $this->wpCli->assignMenuLocation($docroot, (string) $menuId, $location);
+                }
+
+            } catch (\Throwable $e) {
+                \Log::warning("BlueprintService: errore creazione menu '{$name}': " . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Aggiunge i widget alle sidebar definite nel blueprint.
+     */
+    public function createWidgets(string $docroot, array $widgets): void
+    {
+        $position = 1;
+        $currentSidebar = null;
+
+        foreach ($widgets as $widget) {
+            $sidebarId  = $widget['sidebar_id']  ?? '';
+            $widgetType = $widget['widget_type'] ?? '';
+            $settings   = $widget['settings']   ?? [];
+
+            if (! $sidebarId || ! $widgetType) continue;
+
+            // Resetta il contatore posizione quando cambia sidebar
+            if ($sidebarId !== $currentSidebar) {
+                $position       = 1;
+                $currentSidebar = $sidebarId;
+            }
+
+            try {
+                $this->wpCli->addWidget($docroot, $sidebarId, $widgetType, $position, $settings);
+                $position++;
+            } catch (\Throwable $e) {
+                \Log::warning("BlueprintService: errore aggiunta widget '{$widgetType}' a '{$sidebarId}': " . $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * Reset e riapplica pagine blueprint su un sito già installato.
+     */
+    public function resetAndApplyPages(Site $site, Blueprint $blueprint): void
+    {
+        $docroot = $site->docroot;
+
+        // Elimina le pagine con gli stessi slug del blueprint
+        foreach ($blueprint->pages ?? [] as $page) {
+            $slug = $page['slug'] ?? Str::slug($page['title'] ?? '');
+            if ($slug) {
+                $this->wpCli->deletePage($docroot, $slug);
+            }
+        }
+
+        // Ricrea le pagine
+        $this->createPages($docroot, $blueprint->pages ?? []);
+    }
+
+    /**
+     * Reset e riapplica widget blueprint su un sito già installato.
+     */
+    public function resetAndApplyWidgets(Site $site, Blueprint $blueprint): void
+    {
+        $docroot = $site->docroot;
+
+        // Svuota le sidebar coinvolte nel blueprint
+        $sidebars = collect($blueprint->widgets ?? [])
+            ->pluck('sidebar_id')
+            ->unique()
+            ->filter();
+
+        foreach ($sidebars as $sidebarId) {
+            $this->wpCli->resetSidebar($docroot, $sidebarId);
+        }
+
+        // Riaggiunge i widget
+        $this->createWidgets($docroot, $blueprint->widgets ?? []);
     }
 
     /**
