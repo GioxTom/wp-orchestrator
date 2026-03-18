@@ -45,7 +45,7 @@
                         <span class="font-mono text-sm text-gray-900 dark:text-gray-100 truncate" x-show="shown" x-cloak>
                             {{ $field['value'] }}
                         </span>
-                        <span class="font-mono text-sm text-gray-400 tracking-widest" x-show="!shown">
+                        <span class="font-mono text-sm text-gray-400 tracking-widest" x-show="!shown" >
                             ••••••••••••
                         </span>
                         <button
