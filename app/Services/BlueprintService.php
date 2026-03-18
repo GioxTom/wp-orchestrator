@@ -11,6 +11,7 @@ class BlueprintService
 {
     public function __construct(private readonly WpCliService $wpCli)
     {
+        
     }
 
     /**
