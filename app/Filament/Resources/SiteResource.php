@@ -161,6 +161,63 @@ class SiteResource extends Resource
                         ->default(fn () => \App\Models\Setting::get('gemini_logo_aspect', '1:1'))
                         ->helperText('Sovrascrive il default globale nelle Impostazioni.'),
                 ])->columns(2),
+
+            // ── STEP 4: Categorie AI ─────────────────────────────────────────
+            Forms\Components\Section::make('Step 4 — Generazione categorie')
+                ->schema([
+                    Forms\Components\Checkbox::make('auto_categories')
+                        ->label('Genera categorie WordPress con AI')
+                        ->default(true)
+                        ->live()
+                        ->columnSpanFull(),
+
+                    Forms\Components\TextInput::make('categories_count')
+                        ->label('Numero categorie')
+                        ->numeric()
+                        ->default(4)
+                        ->minValue(1)
+                        ->maxValue(20)
+                        ->visible(fn (Forms\Get $get) => $get('auto_categories')),
+
+                    Forms\Components\Select::make('categories_prompt_id')
+                        ->label('Prompt categorie')
+                        ->options(fn () => \App\Models\Prompt::where('action', 'category_generation')
+                            ->get()
+                            ->mapWithKeys(fn ($p) => [
+                                $p->id => ($p->type === 'system' ? '⚙️ ' : '✏️ ') . $p->name,
+                            ]))
+                        ->placeholder('Default di sistema')
+                        ->searchable()
+                        ->visible(fn (Forms\Get $get) => $get('auto_categories'))
+                        ->helperText('Lascia vuoto per usare il prompt di sistema predefinito.'),
+
+                    Forms\Components\Select::make('categories_ai_provider')
+                        ->label('Provider AI')
+                        ->options([
+                            'claude' => '🟣 Claude',
+                            'openai' => '🟢 ChatGPT',
+                        ])
+                        ->placeholder('Default globale (' . ucfirst(\App\Models\Setting::get('ai_content_provider', 'claude')) . ')')
+                        ->live()
+                        ->visible(fn (Forms\Get $get) => $get('auto_categories')),
+
+                    Forms\Components\Select::make('categories_ai_model')
+                        ->label('Modello AI')
+                        ->options(fn (Forms\Get $get) => match($get('categories_ai_provider')) {
+                            'openai' => [
+                                'gpt-4o'      => 'GPT-4o',
+                                'gpt-4o-mini' => 'GPT-4o Mini',
+                                'gpt-4-turbo' => 'GPT-4 Turbo',
+                            ],
+                            default => [
+                                'claude-opus-4-6'            => 'Claude Opus 4.6',
+                                'claude-sonnet-4-5'          => 'Claude Sonnet 4.5',
+                                'claude-haiku-4-5-20251001'  => 'Claude Haiku 4.5',
+                            ],
+                        })
+                        ->placeholder('Default del provider')
+                        ->visible(fn (Forms\Get $get) => $get('auto_categories') && $get('categories_ai_provider')),
+                ])->columns(2),
         ]);
     }
 
@@ -443,6 +500,9 @@ class SiteResource extends Resource
                     ->tooltip('Rigenera logo')
                     ->color('info')
                     ->visible(fn (Site $record) => $record->isActive())
+                    ->fillForm(fn (Site $record) => [
+                        'logo_aspect_ratio' => $record->logo_aspect_ratio ?: \App\Models\Setting::get('gemini_logo_aspect', '1:1'),
+                    ])
                     ->form([
                         Forms\Components\Select::make('logo_aspect_ratio')
                             ->label('Aspect ratio logo')
@@ -453,7 +513,6 @@ class SiteResource extends Resource
                                 '16:9' => '16:9 — Widescreen',
                                 '9:16' => '9:16 — Verticale largo',
                             ])
-                            ->default(fn (Site $record) => $record->logo_aspect_ratio ?: \App\Models\Setting::get('gemini_logo_aspect', '1:1'))
                             ->required(),
                     ])
                     ->action(function (Site $record, array $data) {

@@ -31,6 +31,12 @@ class SettingsPage extends Page implements HasForms
             'gemini_image_size'      => Setting::get('gemini_image_size', '1K'),
             'gemini_logo_aspect'     => Setting::get('gemini_logo_aspect', '1:1'),
             'gemini_use_batch'       => Setting::get('gemini_use_batch', '0') === '1',
+            // AI contenuti
+            'ai_content_provider'   => Setting::get('ai_content_provider', 'claude'),
+            'claude_api_key'        => Setting::get('claude_api_key') ? '••••••••' : '',
+            'claude_model'          => Setting::get('claude_model', 'claude-sonnet-4-5'),
+            'openai_api_key'        => Setting::get('openai_api_key') ? '••••••••' : '',
+            'openai_model'          => Setting::get('openai_model', 'gpt-4o-mini'),
         ]);
     }
 
@@ -163,6 +169,61 @@ class SettingsPage extends Page implements HasForms
                             ->columnSpanFull(),
                     ])->columns(2),
 
+                // ── AI Contenuti ──────────────────────────────────────────────
+                Forms\Components\Section::make('🤖 AI per contenuti (testi, categorie...)')
+                    ->description('Provider AI usato per generare testi durante il provisioning dei siti.')
+                    ->schema([
+
+                        Forms\Components\Select::make('ai_content_provider')
+                            ->label('Provider predefinito')
+                            ->options([
+                                'claude' => '🟣 Claude (Anthropic)',
+                                'openai' => '🟢 ChatGPT (OpenAI)',
+            ])
+                            ->default('claude')
+                            ->live()
+                            ->columnSpanFull(),
+
+                        // Claude
+                        Forms\Components\TextInput::make('claude_api_key')
+                            ->label('API Key Claude')
+                            ->password()
+                            ->revealable()
+                            ->placeholder('sk-ant-...')
+                            ->helperText('Ottienila su console.anthropic.com')
+                            ->visible(fn (Forms\Get $get) => $get('ai_content_provider') === 'claude'),
+
+                        Forms\Components\Select::make('claude_model')
+                            ->label('Modello Claude')
+                            ->options([
+                                'claude-opus-4-6'        => 'Claude Opus 4.6 — massima qualità',
+                                'claude-sonnet-4-5'      => 'Claude Sonnet 4.5 — bilanciato (consigliato)',
+                                'claude-haiku-4-5-20251001' => 'Claude Haiku 4.5 — veloce, economico',
+                            ])
+                            ->default('claude-sonnet-4-5')
+                            ->visible(fn (Forms\Get $get) => $get('ai_content_provider') === 'claude'),
+
+                        // OpenAI
+                        Forms\Components\TextInput::make('openai_api_key')
+                            ->label('API Key OpenAI')
+                            ->password()
+                            ->revealable()
+                            ->placeholder('sk-...')
+                            ->helperText('Ottienila su platform.openai.com')
+                            ->visible(fn (Forms\Get $get) => $get('ai_content_provider') === 'openai'),
+
+                        Forms\Components\Select::make('openai_model')
+                            ->label('Modello OpenAI')
+                            ->options([
+                                'gpt-4o'      => 'GPT-4o — massima qualità',
+                                'gpt-4o-mini' => 'GPT-4o Mini — veloce, economico (consigliato)',
+                                'gpt-4-turbo' => 'GPT-4 Turbo',
+                            ])
+                            ->default('gpt-4o-mini')
+                            ->visible(fn (Forms\Get $get) => $get('ai_content_provider') === 'openai'),
+
+                    ])->columns(2),
+
             ])
             ->statePath('data');
     }
@@ -179,6 +240,18 @@ class SettingsPage extends Page implements HasForms
         Setting::set('gemini_image_size',    $data['gemini_image_size']    ?? '1K');
         Setting::set('gemini_logo_aspect',   $data['gemini_logo_aspect']   ?? '1:1');
         Setting::set('gemini_use_batch',     ($data['gemini_use_batch']    ?? false) ? '1' : '0');
+
+        // AI contenuti
+        Setting::set('ai_content_provider', $data['ai_content_provider'] ?? 'claude');
+        Setting::set('claude_model',        $data['claude_model']        ?? 'claude-sonnet-4-5');
+        Setting::set('openai_model',        $data['openai_model']        ?? 'gpt-4o-mini');
+
+        if (! empty($data['claude_api_key']) && $data['claude_api_key'] !== '••••••••') {
+            Setting::set('claude_api_key', $data['claude_api_key'], true);
+        }
+        if (! empty($data['openai_api_key']) && $data['openai_api_key'] !== '••••••••') {
+            Setting::set('openai_api_key', $data['openai_api_key'], true);
+        }
 
         Notification::make()
             ->title('Impostazioni salvate')

@@ -36,6 +36,11 @@ class Site extends Model
         'logo_batch_job',
         'logo_status',
         'logo_aspect_ratio',
+        'auto_categories',
+        'categories_count',
+        'categories_ai_provider',
+        'categories_ai_model',
+        'categories_prompt_id',
         'status',
         'current_step',
         'ssl_enabled',
@@ -46,6 +51,8 @@ class Site extends Model
         'wp_admin_password'  => 'encrypted',
         'ssl_enabled'        => 'boolean',
         'logo_generated_at'  => 'datetime',
+        'auto_categories'    => 'boolean',
+        'categories_count'   => 'integer',
     ];
 
     protected $hidden = [
@@ -63,6 +70,11 @@ class Site extends Model
         return $this->belongsTo(IspConfigClient::class, 'ispconfig_client_id');
     }
 
+    public function categoriesPrompt(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(\App\Models\Prompt::class, 'categories_prompt_id');
+    }
+    
     public function blueprint(): BelongsTo
     {
         return $this->belongsTo(Blueprint::class);

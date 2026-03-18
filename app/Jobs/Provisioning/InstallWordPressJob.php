@@ -8,7 +8,7 @@ use Illuminate\Support\Str;
 class InstallWordPressJob extends BaseProvisioningJob
 {
     protected function stepLabel(): string { return 'Installazione WordPress'; }
-    protected function nextJob(): ?string  { return ApplyBlueprintJob::class; }
+    protected function nextJob(): ?string  { return GenerateCategoriesJob::class; }
 
     protected function execute(): void
     {
@@ -30,16 +30,21 @@ class InstallWordPressJob extends BaseProvisioningJob
             'password' => $site->db_password,
         ]);
 
-        // 3. Installa WordPress
+        // 3. Installa WordPress con URL corretto in base a www_mode
+        $wwwMode = $site->www_mode ?? 'www';
+        $prefix  = $wwwMode === 'www' ? 'www.' : '';
+        $siteUrl = "https://{$prefix}{$site->domain}";
+
         $wpCli->coreInstall($docroot, [
-            'domain'         => $site->domain,
+            'domain'         => "{$prefix}{$site->domain}",
             'title'          => $site->site_name,
             'admin_password' => $adminPassword,
             'admin_email'    => $site->wp_admin_email,
         ]);
 
-        // 4. Imposta titolo e descrizione
-        $wpCli->setSiteInfo($docroot, $site->site_name, $site->description ?? '');
+        // 4. Configura siteurl e home esplicitamente (la description non va in WP)
+        $wpCli->setSiteUrl($docroot, $site->domain, $wwwMode);
+        $wpCli->updateOption($docroot, 'blogname', $site->site_name);
 
         // 5. Imposta la lingua
         if ($site->locale !== 'en_US') {
