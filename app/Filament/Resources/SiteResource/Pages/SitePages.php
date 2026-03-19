@@ -51,9 +51,8 @@ class ViewSite extends ViewRecord
     public function getHeader(): ?\Illuminate\Contracts\View\View
     {
         return view('filament.pages.view-site-header', [
-            'heading'     => $this->getTitle(),
-            'description' => $this->record->description,
-            'actions'     => $this->getCachedHeaderActions(),
+            'heading' => $this->getTitle(),
+            'actions' => $this->getCachedHeaderActions(),
         ]);
     }
 
@@ -248,6 +247,10 @@ class ViewSite extends ViewRecord
                     Infolists\Components\TextEntry::make('status')->label('Stato')->badge(),
                     Infolists\Components\TextEntry::make('wp_admin_email')->label('Email admin'),
                     Infolists\Components\TextEntry::make('blueprint.name')->label('Blueprint'),
+                    Infolists\Components\TextEntry::make('description')
+                        ->label('Descrizione')
+                        ->placeholder('—')
+                        ->columnSpanFull(),
                 ])->columns(3),
 
             Infolists\Components\Section::make('Provisioning')
