@@ -82,10 +82,15 @@ class NanaBananaService
             ]);
 
             if ($response->failed()) {
+                $status = $response->status();
                 Log::error("NanaBananaService: errore API Gemini", [
-                    'status' => $response->status(),
+                    'status' => $status,
                     'body'   => $response->body(),
                 ]);
+                // 503 = overload transitorio → rilancia per far ritentare il job
+                if ($status === 503 || $status === 429) {
+                    throw new \RuntimeException("Gemini API temporaneamente non disponibile (HTTP {$status}). Retry.");
+                }
                 return null;
             }
 
@@ -137,24 +142,13 @@ class NanaBananaService
                 ],
             ]);
 
-            // Step 1: Upload del file JSONL tramite Files API (multipart)
-            // La Files API richiede multipart/form-data con metadata + file
-            $boundary = 'batch_' . uniqid();
-
-            $body  = "--{$boundary}\r\n";
-            $body .= "Content-Type: application/json; charset=utf-8\r\n\r\n";
-            $body .= json_encode(['mimeType' => 'application/jsonl']) . "\r\n";
-            $body .= "--{$boundary}\r\n";
-            $body .= "Content-Type: application/jsonl\r\n\r\n";
-            $body .= $requestLine . "\r\n";
-            $body .= "--{$boundary}--";
-
+            // Step 1: Upload del file JSONL tramite Files API
+            // Multipart/form-data standard con attach() — il modo corretto per la Gemini Files API
             $uploadResponse = Http::withHeaders([
                 'x-goog-api-key' => $this->apiKey,
-                'Content-Type'   => "multipart/related; boundary={$boundary}",
             ])
             ->timeout(30)
-            ->withBody($body, "multipart/related; boundary={$boundary}")
+            ->attach('file', $requestLine, 'batch.jsonl', ['Content-Type' => 'application/jsonl'])
             ->post('https://generativelanguage.googleapis.com/upload/v1beta/files');
 
             if ($uploadResponse->failed()) {

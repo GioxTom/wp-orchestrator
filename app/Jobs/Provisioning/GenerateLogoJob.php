@@ -25,8 +25,17 @@ class GenerateLogoJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries   = 2;
-    public int $timeout = 120;
+    public int $tries   = 5;
+    public int $timeout = 180;
+
+    /**
+     * Backoff progressivo tra i tentativi: 1min, 5min, 15min, 30min.
+     * Gestisce i 503 transitori di Gemini senza martellare l'API.
+     */
+    public function backoff(): array
+    {
+        return [60, 300, 900, 1800];
+    }
 
     public function __construct(private readonly Site $site)
     {
