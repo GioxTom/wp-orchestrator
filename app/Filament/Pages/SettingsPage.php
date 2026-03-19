@@ -25,19 +25,23 @@ class SettingsPage extends Page implements HasForms
     protected static ?int    $navigationSort  = 20;
     protected static string  $view            = 'filament.pages.settings';
 
-    public ?array $logoData = [];
-    public ?array $aiData   = [];
+    public ?array $nanaBananaData = [];
+    public ?array $logoData       = [];
+    public ?array $aiData         = [];
 
     // ─── Mount ────────────────────────────────────────────────────────────
 
     public function mount(): void
     {
-        $this->logoForm->fill([
+        $this->nanaBananaForm->fill([
             'gemini_api_key'    => Setting::get('gemini_api_key') ? '••••••••' : '',
             'gemini_model'      => Setting::get('gemini_model', 'gemini-3.1-flash-image-preview'),
             'gemini_image_size' => Setting::get('gemini_image_size', '1K'),
-            'gemini_logo_aspect'=> Setting::get('gemini_logo_aspect', '1:1'),
             'gemini_use_batch'  => Setting::get('gemini_use_batch', '0') === '1',
+        ]);
+
+        $this->logoForm->fill([
+            'gemini_logo_aspect' => Setting::get('gemini_logo_aspect', '1:1'),
         ]);
 
         $this->aiForm->fill([
@@ -49,18 +53,18 @@ class SettingsPage extends Page implements HasForms
         ]);
     }
 
-    // ─── Logo Form ────────────────────────────────────────────────────────
+    // ─── Nano Banana Form ─────────────────────────────────────────────────
 
-    protected function getLogoFormSchema(): array
+    protected function getNanaBananaFormSchema(): array
     {
         return [
-            Forms\Components\Section::make('📖 Guida Nano Banana')
+            Forms\Components\Section::make('📖 Guida')
                 ->schema([
-                    Forms\Components\Placeholder::make('guide_logo')
+                    Forms\Components\Placeholder::make('guide_nb')
                         ->label('')
                         ->content(new HtmlString('
                             <div class="space-y-4 text-sm">
-                                <p>Nano Banana usa <strong>Google Gemini</strong> per generare i loghi.
+                                <p><strong>Nano Banana</strong> usa Google Gemini per generare immagini.
                                 Due modelli: <strong>Flash</strong> (veloce, 1K) e <strong>Pro</strong> (alta qualità, fino a 4K).</p>
                                 <ol class="list-decimal list-inside space-y-1 ml-2">
                                     <li>Vai su <a href="https://aistudio.google.com/apikey" target="_blank" class="text-primary-600 underline">aistudio.google.com/apikey</a> e crea una API Key</li>
@@ -113,7 +117,7 @@ class SettingsPage extends Page implements HasForms
                         ->helperText('Lascia vuoto per mantenere la chiave attuale.'),
                 ]),
 
-            Forms\Components\Section::make('⚙️ Configurazione Modello')
+            Forms\Components\Section::make('⚙️ Modello e Risoluzione')
                 ->schema([
                     Forms\Components\Select::make('gemini_model')
                         ->label('Modello Gemini')
@@ -138,7 +142,47 @@ class SettingsPage extends Page implements HasForms
                             return ['1K' => '1K (1024×1024) — $0.039/img'];
                         })
                         ->default('1K'),
+                ])
+                ->columns(2),
 
+            Forms\Components\Section::make('⚡ Batch API')
+                ->schema([
+                    Forms\Components\Toggle::make('gemini_use_batch')
+                        ->label('Usa Batch API (−50% sul costo)')
+                        ->helperText('Invia le richieste in modalità asincrona a metà prezzo. Turnaround tipico: 2–10 minuti, massimo 24h.')
+                        ->default(false),
+                ]),
+        ];
+    }
+
+    public function nanaBananaForm(Form $form): Form
+    {
+        return $form->schema($this->getNanaBananaFormSchema())->statePath('nanaBananaData');
+    }
+
+    public function salvaNanaBanana(): void
+    {
+        $data = $this->nanaBananaForm->getState();
+
+        $key = trim($data['gemini_api_key'] ?? '');
+        if ($key && $key !== '••••••••') {
+            Setting::set('gemini_api_key', $key);
+        }
+
+        Setting::set('gemini_model',      $data['gemini_model']      ?? 'gemini-3.1-flash-image-preview');
+        Setting::set('gemini_image_size', $data['gemini_image_size'] ?? '1K');
+        Setting::set('gemini_use_batch',  ($data['gemini_use_batch'] ?? false) ? '1' : '0');
+
+        Notification::make()->title('Impostazioni Nano Banana salvate')->success()->send();
+    }
+
+    // ─── Logo Form ────────────────────────────────────────────────────────
+
+    protected function getLogoFormSchema(): array
+    {
+        return [
+            Forms\Components\Section::make('🖼️ Formato Logo')
+                ->schema([
                     Forms\Components\Select::make('gemini_logo_aspect')
                         ->label('Aspect Ratio')
                         ->options([
@@ -148,14 +192,9 @@ class SettingsPage extends Page implements HasForms
                             '16:9' => '16:9 — Widescreen',
                             '9:16' => '9:16 — Portrait',
                         ])
-                        ->default('1:1'),
-
-                    Forms\Components\Toggle::make('gemini_use_batch')
-                        ->label('Usa Batch API (−50%)')
-                        ->helperText('Genera in modo asincrono a metà prezzo. Turnaround tipico: 2–10 min.')
-                        ->default(false),
-                ])
-                ->columns(2),
+                        ->default('1:1')
+                        ->helperText('Proporzioni dell\'immagine generata per il logo.'),
+                ]),
         ];
     }
 
@@ -168,15 +207,7 @@ class SettingsPage extends Page implements HasForms
     {
         $data = $this->logoForm->getState();
 
-        $key = trim($data['gemini_api_key'] ?? '');
-        if ($key && $key !== '••••••••') {
-            Setting::set('gemini_api_key', $key);
-        }
-
-        Setting::set('gemini_model',       $data['gemini_model']       ?? 'gemini-3.1-flash-image-preview');
-        Setting::set('gemini_image_size',  $data['gemini_image_size']  ?? '1K');
         Setting::set('gemini_logo_aspect', $data['gemini_logo_aspect'] ?? '1:1');
-        Setting::set('gemini_use_batch',   ($data['gemini_use_batch']  ?? false) ? '1' : '0');
 
         Notification::make()->title('Impostazioni Logo salvate')->success()->send();
     }
@@ -294,6 +325,6 @@ class SettingsPage extends Page implements HasForms
 
     protected function getForms(): array
     {
-        return ['logoForm', 'aiForm'];
+        return ['nanaBananaForm', 'logoForm', 'aiForm'];
     }
 }
