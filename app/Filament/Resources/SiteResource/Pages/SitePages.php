@@ -48,15 +48,6 @@ class ViewSite extends ViewRecord
 {
     protected static string $resource = SiteResource::class;
 
-    public function getHeader(): ?\Illuminate\Contracts\View\View
-    {
-        return view('filament.pages.view-site-header', [
-            'heading'    => $this->getTitle(),
-            'subheading' => null,
-            'actions'    => $this->getRenderedHeaderActions(),
-        ]);
-    }
-
     protected function getHeaderActions(): array
     {
         return [
