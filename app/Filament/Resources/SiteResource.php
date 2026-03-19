@@ -492,6 +492,27 @@ class SiteResource extends Resource
                             ->send();
                     }),
 
+                // Genera categorie AI
+                Tables\Actions\Action::make('generate_categories')
+                    ->icon('heroicon-o-tag')
+                    ->iconButton()
+                    ->tooltip('Genera categorie con AI')
+                    ->color('info')
+                    ->visible(fn (Site $record) => $record->isActive())
+                    ->requiresConfirmation()
+                    ->modalHeading('Generare nuove categorie?')
+                    ->modalDescription('L\'AI genererà nuove categorie basate sulla descrizione del sito e le aggiungerà a quelle esistenti.')
+                    ->modalSubmitActionLabel('Genera')
+                    ->action(function (Site $record) {
+                        $created = \App\Services\CategoryGenerationService::generate($record, deleteExisting: false);
+
+                        Notification::make()
+                            ->title(count($created) . ' categorie aggiunte')
+                            ->body(implode(', ', $created))
+                            ->success()
+                            ->send();
+                    }),
+
                 // Rigenera logo
                 Tables\Actions\Action::make('regenerate_logo')
                     ->label('Rigenera logo')

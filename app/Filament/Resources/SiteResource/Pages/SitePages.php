@@ -134,6 +134,26 @@ class ViewSite extends ViewRecord
                         ->title('Widget ripristinati')->success()->send();
                 }),
 
+            // Genera categorie AI
+            Actions\Action::make('generate_categories')
+                ->label('Genera categorie')
+                ->icon('heroicon-o-tag')
+                ->color('info')
+                ->visible(fn () => $this->record->isActive())
+                ->requiresConfirmation()
+                ->modalHeading('Generare nuove categorie?')
+                ->modalDescription('L\'AI genererà nuove categorie basate sulla descrizione del sito e le aggiungerà a quelle esistenti.')
+                ->modalSubmitActionLabel('Genera')
+                ->action(function () {
+                    $created = \App\Services\CategoryGenerationService::generate($this->record, deleteExisting: false);
+
+                    \Filament\Notifications\Notification::make()
+                        ->title(count($created) . ' categorie aggiunte')
+                        ->body(implode(', ', $created))
+                        ->success()
+                        ->send();
+                }),
+
             // Reset password admin
             Actions\Action::make('reset_password')
                 ->label('Reset password admin')
