@@ -268,6 +268,13 @@ class IspConfigService
             'apache_directives'      => '',
             'nginx_directives'       => '',
             'active'                 => 'y',
+            // Campi richiesti dal validatore REGEX di web_vhost_domain.tform.php.
+            // ISPConfig non li imposta automaticamente via API (a differenza dell'interfaccia web).
+            // Valori identici ai default del tform: pm_process_idle_timeout=10, gli altri=0.
+            'http_port'               => 0,
+            'https_port'              => 0,
+            'pm_process_idle_timeout' => 10,
+            'pm_max_requests'         => 0,
         ];
 
         $merged    = array_merge($defaults, $params);
@@ -404,6 +411,61 @@ class IspConfigService
             'domain_id'  => $domainId,
             'params'     => $domain,
         ]);
+    }
+
+    public function deleteWebDomain(int $domainId): void
+    {
+        $this->connect();
+
+        $this->post('sites_web_domain_delete', [
+            'session_id' => $this->sessionId,
+            'primary_id' => $domainId,
+        ]);
+    }
+
+    public function deleteDatabase(int $dbId): void
+    {
+        $this->connect();
+
+        $this->post('sites_database_delete', [
+            'session_id' => $this->sessionId,
+            'primary_id' => $dbId,
+        ]);
+    }
+
+    public function deleteDatabaseUser(int $userId): void
+    {
+        $this->connect();
+
+        try {
+            $this->post('sites_database_user_delete', [
+                'session_id' => $this->sessionId,
+                'primary_id' => $userId,
+            ]);
+        } catch (\Throwable) {
+            // L'utente DB potrebbe essere condiviso — ignoriamo se la delete fallisce
+        }
+    }
+
+    /**
+     * Recupera l'ID utente DB associato a un database ISPConfig.
+     */
+    public function getDatabaseUserId(int $dbId): ?int
+    {
+        $this->connect();
+
+        try {
+            $response = $this->post('sites_database_get', [
+                'session_id' => $this->sessionId,
+                'primary_id' => $dbId,
+            ]);
+
+            $db = $response['response'] ?? [];
+            $userId = $db['database_user_id'] ?? null;
+            return $userId ? (int) $userId : null;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     // ────────────────────────────────────────────────────────────────────────

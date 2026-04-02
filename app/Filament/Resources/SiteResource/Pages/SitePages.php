@@ -230,6 +230,75 @@ class ViewSite extends ViewRecord
                         ->title('Sito abilitato')->success()->send();
                 }),
 
+            // ── Eliminazione ──────────────────────────────────────────────────
+
+            // Elimina da tutto (ISPConfig + orchestrator)
+            Actions\Action::make('delete_from_ispconfig')
+                ->label('Elimina da tutto')
+                ->icon('heroicon-o-trash')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalHeading(fn () => 'Eliminare ' . $this->record->domain . ' da tutto?')
+                ->modalDescription('Verranno eliminati: vhost ISPConfig, database MariaDB, e il record nell\'orchestrator. I file sul disco vengono rimossi da ISPConfig in modo asincrono.')
+                ->modalSubmitActionLabel('Sì, elimina da tutto')
+                ->action(function () {
+                    if ($this->record->ispconfig_domain_id || $this->record->ispconfig_db_id) {
+                        try {
+                            $ispConfig = new \App\Services\IspConfigService($this->record->server);
+
+                            if ($this->record->ispconfig_db_id) {
+                                $userId = $ispConfig->getDatabaseUserId($this->record->ispconfig_db_id);
+                                $ispConfig->deleteDatabase($this->record->ispconfig_db_id);
+                                if ($userId) {
+                                    $ispConfig->deleteDatabaseUser($userId);
+                                }
+                            }
+
+                            if ($this->record->ispconfig_domain_id) {
+                                $ispConfig->deleteWebDomain($this->record->ispconfig_domain_id);
+                            }
+
+                            $ispConfig->disconnect();
+                        } catch (\Throwable $e) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Attenzione — Errore ISPConfig')
+                                ->body($e->getMessage() . '. Il record è stato comunque rimosso dall\'orchestrator.')
+                                ->warning()
+                                ->persistent()
+                                ->send();
+                        }
+                    }
+
+                    $this->record->delete();
+
+                    \Filament\Notifications\Notification::make()
+                        ->title('Sito eliminato')
+                        ->success()
+                        ->send();
+
+                    $this->redirect($this->getResource()::getUrl('index'));
+                }),
+
+            // Rimuovi solo da orchestrator
+            Actions\Action::make('delete_from_orchestrator')
+                ->label('Rimuovi da orchestrator')
+                ->icon('heroicon-o-minus-circle')
+                ->color('warning')
+                ->requiresConfirmation()
+                ->modalHeading(fn () => 'Rimuovere ' . $this->record->domain . ' dall\'orchestrator?')
+                ->modalDescription('Il sito verrà rimosso solo dal database dell\'orchestrator. ISPConfig, i file e il database WordPress rimarranno intatti.')
+                ->modalSubmitActionLabel('Sì, rimuovi da orchestrator')
+                ->action(function () {
+                    $this->record->delete();
+
+                    \Filament\Notifications\Notification::make()
+                        ->title('Sito rimosso dall\'orchestrator')
+                        ->success()
+                        ->send();
+
+                    $this->redirect($this->getResource()::getUrl('index'));
+                }),
+
             // Modifica (solo in pending/error)
             Actions\EditAction::make()
                 ->visible(fn () => in_array($this->record->status, ['pending', 'error'])),
