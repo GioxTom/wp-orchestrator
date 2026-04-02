@@ -64,13 +64,13 @@ class CreateIspConfigDomainJob extends BaseProvisioningJob
             } else {
                 // ── Dominio non esiste → crea normalmente ────────────────────
                 $domainId = $ispConfig->createWebDomain([
-                    'client_id'           => $client->ispconfig_client_id,
-                    'domain'              => $this->site->domain,
-                    'ssl'                 => $this->site->ssl_enabled ? 'y' : 'n',
-                    'ssl_letsencrypt'     => $this->site->ssl_enabled ? 'y' : 'n',
-                    'php'                 => 'php-fpm',
-                    'php_fpm_use_socket'  => 'y',
-                    'fastcgi_php_version' => $phpVersion?->version ?? '',
+                    'client_id'       => $client->ispconfig_client_id,
+                    'domain'          => $this->site->domain,
+                    'ssl'             => $this->site->ssl_enabled ? 'y' : 'n',
+                    'ssl_letsencrypt' => $this->site->ssl_enabled ? 'y' : 'n',
+                    'php'             => 'php-fpm',
+                    'php_fpm_use_socket' => 'y',
+                    'server_php_id'   => $phpVersion?->ispconfig_server_php_id ?? 0,
                 ]);
 
                 $this->site->update(['ispconfig_domain_id' => $domainId]);

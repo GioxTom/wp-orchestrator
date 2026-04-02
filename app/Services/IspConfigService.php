@@ -135,14 +135,74 @@ class IspConfigService
         return $count;
     }
 
+    /**
+     * Sincronizza le versioni PHP da ISPConfig via API server_get_php_versions.
+     * Salva il server_php_id di ISPConfig per usarlo nella creazione dei domini.
+     */
     public function syncPhpVersions(): int
     {
         $this->connect();
 
-        $phpVersions = $this->detectPhpVersions();
-        $count       = 0;
+        // Recupera l'ID server ISPConfig (sempre 1 in setup single-server)
+        $ispConfigServerId = 1;
 
-        foreach ($phpVersions as $version) {
+        $response = $this->post('server_get_php_versions', [
+            'session_id'    => $this->sessionId,
+            'server_id'     => $ispConfigServerId,
+            'php'           => 'php-fpm',
+            'get_full_data' => true,
+        ]);
+
+        $phpRecords = $response['response'] ?? [];
+        $count      = 0;
+
+        if (is_array($phpRecords) && ! empty($phpRecords)) {
+            foreach ($phpRecords as $record) {
+                // Estrai la versione numerica dal nome (es. "PHP 8.3 (FPM)" → "8.3")
+                // oppure dal percorso ini (es. "/etc/php/8.3/fpm/php.ini" → "8.3")
+                $version = $this->extractVersionNumber(
+                    $record['name'] ?? '',
+                    $record['php_fpm_ini_dir'] ?? ''
+                );
+
+                if (! $version) {
+                    Log::warning("IspConfigService::syncPhpVersions — impossibile determinare versione per: " . json_encode($record));
+                    continue;
+                }
+
+            IspConfigPhpVersion::updateOrCreate(
+                [
+                    'server_id' => $this->server->id,
+                        'version'   => $version,
+                    ],
+                    [
+                        'label'                   => $record['name'] ?? "PHP {$version} (FPM)",
+                        'fpm_config_path'         => $record['php_fpm_ini_dir'] ?? null,
+                        'ispconfig_server_php_id' => (int) $record['server_php_id'],
+                    ]
+                );
+                $count++;
+            }
+
+            Log::info("IspConfigService::syncPhpVersions — {$count} versioni PHP sincronizzate da ISPConfig API");
+            return $count;
+        }
+
+        // Fallback: rilevamento locale se ISPConfig non restituisce versioni
+        Log::warning("IspConfigService::syncPhpVersions — API non ha restituito versioni PHP, uso rilevamento locale");
+        return $this->syncPhpVersionsLocal();
+    }
+
+    /**
+     * Fallback locale per il rilevamento PHP (usato solo se ISPConfig API non risponde).
+     * Non salva ispconfig_server_php_id perché non è disponibile.
+     */
+    private function syncPhpVersionsLocal(): int
+    {
+        $versions = $this->detectPhpVersions();
+        $count    = 0;
+
+        foreach ($versions as $version) {
             IspConfigPhpVersion::updateOrCreate(
                 [
                     'server_id' => $this->server->id,
@@ -151,6 +211,7 @@ class IspConfigService
                 [
                     'label'           => $version['label'],
                     'fpm_config_path' => $version['fpm_config_path'],
+                    // ispconfig_server_php_id rimane null — richiede sync manuale
                 ]
             );
             $count++;
@@ -170,6 +231,26 @@ class IspConfigService
         }
 
         return $count;
+    }
+
+    /**
+     * Estrae il numero di versione PHP da nome o percorso ini.
+     * Es: "PHP 8.3 (FPM)" → "8.3"
+     *     "/etc/php/8.3/fpm/php.ini" → "8.3"
+     */
+    private function extractVersionNumber(string $name, string $iniPath): ?string
+    {
+        // Prova dal nome: "PHP 8.3 (FPM)"
+        if (preg_match('/(\d+\.\d+)/', $name, $m)) {
+            return $m[1];
+        }
+
+        // Prova dal percorso ini: "/etc/php/8.3/fpm/..."
+        if (preg_match('#/php/(\d+\.\d+)/#', $iniPath, $m)) {
+            return $m[1];
+        }
+
+        return null;
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -219,8 +300,8 @@ class IspConfigService
             'primary_id' => $domainId,
         ]);
 
-        $domain = $response['response'] ?? [];
-
+        $domain  = $response['response'] ?? [];
+        
         // document_root di ISPConfig NON include /web — va aggiunto
         $webRoot = $domain['document_root'] ?? null;
         if ($webRoot) {
@@ -244,34 +325,34 @@ class IspConfigService
         $this->connect();
 
         $defaults = [
-            'server_id'              => 1,
-            'ip_address'             => '*',
-            'ipv6_address'           => '',
-            'domain'                 => '',
-            'hd_quota'               => -1,
-            'traffic_quota'          => -1,
-            'cgi'                    => 'n',
-            'ssi'                    => 'n',
-            'suexec'                 => 'y',
-            'errordocs'              => 1,
-            'is_subdomainwww'        => 1,
-            'subdomain'              => 'www',
-            'php'                    => 'php-fpm',
-            'php_fpm_use_socket'     => 'y',
-            'ruby'                   => 'n',
-            'redirect_type'          => '',
-            'redirect_path'          => '',
-            'ssl'                    => 'n',
-            'ssl_letsencrypt'        => 'n',
-            'stats_password'         => '',
-            'allow_override'         => 'All',
-            'apache_directives'      => '',
-            'nginx_directives'       => '',
-            'active'                 => 'y'
+            'server_id'          => 1,
+            'ip_address'         => '*',
+            'ipv6_address'       => '',
+            'domain'             => '',
+            'hd_quota'           => -1,
+            'traffic_quota'      => -1,
+            'cgi'                => 'n',
+            'ssi'                => 'n',
+            'suexec'             => 'y',
+            'errordocs'          => 1,
+            'is_subdomainwww'    => 1,
+            'subdomain'          => 'www',
+            'php'                => 'php-fpm',
+            'php_fpm_use_socket' => 'y',
+            'ruby'               => 'n',
+            'redirect_type'      => '',
+            'redirect_path'      => '',
+            'ssl'                => 'n',
+            'ssl_letsencrypt'    => 'n',
+            'stats_password'     => '',
+            'allow_override'     => 'All',
+            'apache_directives'  => '',
+            'nginx_directives'   => '',
+            'active'             => 'y',
         ];
 
-        $merged    = array_merge($defaults, $params);
-        $clientId  = $params['client_id'];
+        $merged   = array_merge($defaults, $params);
+        $clientId = $params['client_id'];
 
         $response = $this->post('sites_web_domain_add', [
             'session_id' => $this->sessionId,

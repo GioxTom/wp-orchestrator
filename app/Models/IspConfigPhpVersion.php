@@ -10,7 +10,7 @@ class IspConfigPhpVersion extends Model
     protected $table = 'ispconfig_php_versions'; // ← aggiungi questa riga
 
     protected $fillable = [
-        'server_id', 'label', 'version', 'fpm_config_path',
+        'server_id', 'label', 'version', 'fpm_config_path', 'ispconfig_server_php_id',
     ];
 
     public function server(): BelongsTo
