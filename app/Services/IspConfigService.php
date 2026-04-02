@@ -268,9 +268,9 @@ class IspConfigService
             'apache_directives'      => '',
             'nginx_directives'       => '',
             'active'                 => 'y',
-            // Campi richiesti dal validatore REGEX di web_vhost_domain.tform.php.
-            // ISPConfig non li imposta automaticamente via API (a differenza dell'interfaccia web).
-            // Valori identici ai default del tform: pm_process_idle_timeout=10, gli altri=0.
+            // Campi che ISPConfig non imposta automaticamente via API.
+            // Valori identici ai default del tform ISPConfig.
+            'pm'                      => 'ondemand',
             'http_port'               => 0,
             'https_port'              => 0,
             'pm_process_idle_timeout' => 10,
