@@ -19,10 +19,9 @@ class CreateIspConfigDomainJob extends BaseProvisioningJob
 
     protected function execute(): void
     {
-        $server     = $this->site->server;
-        $client     = $this->site->ispConfigClient;
-        $phpVersion = $this->site->phpVersion;
-        $ispConfig  = new IspConfigService($server);
+        $server    = $this->site->server;
+        $client    = $this->site->ispConfigClient;
+        $ispConfig = new IspConfigService($server);
 
         if (! $client) {
             throw new \RuntimeException(
@@ -30,6 +29,8 @@ class CreateIspConfigDomainJob extends BaseProvisioningJob
                 "Verifica che la sync ISPConfig sia stata eseguita e che il cliente esista."
             );
         }
+
+        $phpVersion = $this->site->phpVersion;
 
         try {
             // Verifica se il dominio esiste già in ISPConfig
@@ -64,14 +65,14 @@ class CreateIspConfigDomainJob extends BaseProvisioningJob
             } else {
                 // ── Dominio non esiste → crea normalmente ────────────────────
                 $domainId = $ispConfig->createWebDomain([
-                    'client_id'       => $client->ispconfig_client_id,
-                    'domain'          => $this->site->domain,
-                    'ssl'             => $this->site->ssl_enabled ? 'y' : 'n',
-                    'ssl_letsencrypt' => $this->site->ssl_enabled ? 'y' : 'n',
-                    'php'             => 'php-fpm',
+                    'client_id'          => $client->ispconfig_client_id,
+                    'domain'             => $this->site->domain,
+                    'ssl'                => $this->site->ssl_enabled ? 'y' : 'n',
+                    'ssl_letsencrypt'    => $this->site->ssl_enabled ? 'y' : 'n',
+                    'php'                => 'php-fpm',
                     'php_fpm_use_socket' => 'y',
-                    'server_php_id'   => $phpVersion?->ispconfig_server_php_id ?? 0,
-                ]);
+                    'server_php_id'      => $phpVersion?->ispconfig_server_php_id ?? 0,
+                ], $this->site); // ← passa il Site per leggere i valori effettivi (pm, porte, ecc.)
 
                 $this->site->update(['ispconfig_domain_id' => $domainId]);
 

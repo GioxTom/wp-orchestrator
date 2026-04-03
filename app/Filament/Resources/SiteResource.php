@@ -218,6 +218,53 @@ class SiteResource extends Resource
                         ->placeholder('Default del provider')
                         ->visible(fn (Forms\Get $get) => $get('auto_categories') && $get('categories_ai_provider')),
                 ])->columns(2),
+
+            // ── STEP 5: PHP-FPM Override (opzionale) ─────────────────────────
+            Forms\Components\Section::make('Step 5 — PHP-FPM (opzionale)')
+                ->description('Lascia vuoto per usare i valori di default del server.')
+                ->collapsed()
+                ->schema([
+                    Forms\Components\Select::make('pm')
+                        ->label('Process Manager')
+                        ->options([
+                            'ondemand' => 'ondemand',
+                            'dynamic'  => 'dynamic',
+                            'static'   => 'static',
+                        ])
+                        ->placeholder(fn (Forms\Get $get) => 'Default server: ' .
+                            (Server::find($get('server_id'))?->default_pm ?? 'ondemand'))
+                        ->helperText('Sovrascrive il default del server solo per questo sito.'),
+
+                    Forms\Components\TextInput::make('pm_max_children')
+                        ->label('pm.max_children')
+                        ->numeric()
+                        ->minValue(1)
+                        ->placeholder(fn (Forms\Get $get) => 'Default: ' .
+                            (Server::find($get('server_id'))?->default_pm_max_children ?? 10)),
+
+                    Forms\Components\TextInput::make('pm_process_idle_timeout')
+                        ->label('pm.process_idle_timeout (s)')
+                        ->numeric()
+                        ->minValue(1)
+                        ->placeholder(fn (Forms\Get $get) => 'Default: ' .
+                            (Server::find($get('server_id'))?->default_pm_process_idle_timeout ?? 10)),
+
+                    Forms\Components\TextInput::make('pm_max_requests')
+                        ->label('pm.max_requests')
+                        ->numeric()
+                        ->minValue(0)
+                        ->placeholder(fn (Forms\Get $get) => 'Default: ' .
+                            (Server::find($get('server_id'))?->default_pm_max_requests ?? 0))
+                        ->helperText('0 = illimitato.'),
+
+                    Forms\Components\TextInput::make('hd_quota')
+                        ->label('Quota disco (MB)')
+                        ->numeric()
+                        ->placeholder(fn (Forms\Get $get) => 'Default: ' .
+                            (Server::find($get('server_id'))?->default_hd_quota ?? -1))
+                        ->helperText('-1 = illimitato.'),
+
+                ])->columns(2),
         ]);
     }
 

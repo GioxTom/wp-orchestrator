@@ -26,10 +26,23 @@ class Server extends Model
         'status',
         'default_php_version_id',
         'notes',
+        'apache_http_port',
+        'apache_https_port',
+        'default_pm',
+        'default_pm_max_children',
+        'default_pm_process_idle_timeout',
+        'default_pm_max_requests',
+        'default_hd_quota',
     ];
 
     protected $casts = [
-        'ispconfig_password' => 'encrypted',
+        'ispconfig_password'              => 'encrypted',
+        'apache_http_port'                => 'integer',
+        'apache_https_port'               => 'integer',
+        'default_pm_max_children'         => 'integer',
+        'default_pm_process_idle_timeout' => 'integer',
+        'default_pm_max_requests'         => 'integer',
+        'default_hd_quota'                => 'integer',
     ];
 
     protected $hidden = [

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\IspConfigClient;
 use App\Models\IspConfigPhpVersion;
 use App\Models\Server;
+use App\Models\Site;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -320,35 +321,73 @@ class IspConfigService
         );
     }
 
-    public function createWebDomain(array $params): int
+    /**
+     * Crea un web domain in ISPConfig.
+     * Accetta un Site model opzionale per leggere i valori effettivi
+     * (override sito oppure default server).
+     */
+    public function createWebDomain(array $params, ?Site $site = null): int
     {
         $this->connect();
 
+        // Legge i valori effettivi: override sito oppure default server
+        $pm                   = $site?->effectivePm()                   ?? 'ondemand';
+        $pmMaxChildren        = $site?->effectivePmMaxChildren()        ?? 10;
+        $pmProcessIdleTimeout = $site?->effectivePmProcessIdleTimeout() ?? 10;
+        $pmMaxRequests        = $site?->effectivePmMaxRequests()        ?? 0;
+        $hdQuota              = $site?->effectiveHdQuota()              ?? -1;
+        $httpPort             = $this->server->apache_http_port         ?? 8082;
+        $httpsPort            = $this->server->apache_https_port        ?? 8082;
+
         $defaults = [
-            'server_id'          => 1,
-            'ip_address'         => '*',
-            'ipv6_address'       => '',
-            'domain'             => '',
-            'hd_quota'           => -1,
-            'traffic_quota'      => -1,
-            'cgi'                => 'n',
-            'ssi'                => 'n',
-            'suexec'             => 'y',
-            'errordocs'          => 1,
-            'is_subdomainwww'    => 1,
-            'subdomain'          => 'www',
-            'php'                => 'php-fpm',
-            'php_fpm_use_socket' => 'y',
-            'ruby'               => 'n',
-            'redirect_type'      => '',
-            'redirect_path'      => '',
-            'ssl'                => 'n',
-            'ssl_letsencrypt'    => 'n',
-            'stats_password'     => '',
-            'allow_override'     => 'All',
-            'apache_directives'  => '',
-            'nginx_directives'   => '',
-            'active'             => 'y',
+            'server_id'               => 1,
+            'ip_address'              => '*',
+            'ipv6_address'            => '',
+            'domain'                  => '',
+            'type'                    => 'vhost',
+            'parent_domain_id'        => 0,
+            'vhost_type'              => 'name',
+            'hd_quota'                => $hdQuota,
+            'traffic_quota'           => -1,
+            'traffic_quota_lock'      => 'n',
+            'cgi'                     => 'n',
+            'ssi'                     => 'n',
+            'suexec'                  => 'y',
+            'errordocs'               => 1,
+            'is_subdomainwww'         => 1,
+            'subdomain'               => 'www',
+            'php'                     => 'php-fpm',
+            'php_fpm_use_socket'      => 'y',
+            'ruby'                    => 'n',
+            'python'                  => 'n',
+            'perl'                    => 'n',
+            'redirect_type'           => '',
+            'redirect_path'           => '',
+            'ssl'                     => 'n',
+            'ssl_letsencrypt'         => 'n',
+            'ssl_letsencrypt_exclude' => 'n',
+            'stats_password'          => '',
+            'stats_type'              => 'awstats',
+            'allow_override'          => 'All',
+            'apache_directives'       => '',
+            'nginx_directives'        => '',
+            'active'                  => 'y',
+            'backup_interval'         => 'none',
+            'backup_copies'           => 1,
+            'backup_format_web'       => 'default',
+            'backup_format_db'        => 'gzip',
+            'backup_encrypt'          => 'n',
+            // PHP-FPM — valori effettivi da sito/server
+            'pm'                      => $pm,
+            'pm_max_children'         => $pmMaxChildren,
+            'pm_start_servers'        => 2,
+            'pm_min_spare_servers'    => 1,
+            'pm_max_spare_servers'    => 5,
+            'pm_process_idle_timeout' => $pmProcessIdleTimeout,
+            'pm_max_requests'         => $pmMaxRequests,
+            // Porte Apache — dal server config
+            'http_port'               => $httpPort,
+            'https_port'              => $httpsPort,
         ];
 
         $merged   = array_merge($defaults, $params);
@@ -534,7 +573,7 @@ class IspConfigService
                 'primary_id' => $dbId,
             ]);
 
-            $db = $response['response'] ?? [];
+            $db     = $response['response'] ?? [];
             $userId = $db['database_user_id'] ?? null;
             return $userId ? (int) $userId : null;
         } catch (\Throwable) {
@@ -550,7 +589,7 @@ class IspConfigService
     {
         $url = $this->baseUrl . '?' . $method;
 
-        $response = Http::withoutVerifying()  // SSL self-signed
+        $response = Http::withoutVerifying()
             ->timeout(30)
             ->withHeaders(['Content-Type' => 'application/json'])
             ->post($url, $data);

@@ -174,11 +174,72 @@ class ServerResource extends Resource
 
                 ])->columns(2),
 
-            Forms\Components\Textarea::make('notes')
-                ->label('Note')
-                ->placeholder('Informazioni aggiuntive sul server, versione OS, ecc.')
-                ->columnSpanFull(),
+            // ── Porte Apache ──────────────────────────────────────────────────
+            Forms\Components\Section::make('Porte Apache')
+                ->description('Porta interna su cui Apache risponde. Nel tuo setup è 8082 (Nginx fa da proxy davanti).')
+                ->schema([
+                    Forms\Components\TextInput::make('apache_http_port')
+                        ->label('Porta HTTP Apache')
+                        ->numeric()
+                        ->default(8082)
+                        ->required()
+                        ->helperText('Usata da ISPConfig come http_port nel vhost (es. 8082).'),
 
+                    Forms\Components\TextInput::make('apache_https_port')
+                        ->label('Porta HTTPS Apache')
+                        ->numeric()
+                        ->default(8082)
+                        ->required()
+                        ->helperText('Solitamente uguale alla HTTP in setup con Nginx+Varnish.'),
+                ])->columns(2),
+
+            // ── PHP-FPM Defaults ──────────────────────────────────────────────
+            Forms\Components\Section::make('PHP-FPM — Valori di default')
+                ->description('Usati per tutti i siti su questo server, salvo override nel singolo sito.')
+                ->schema([
+                    Forms\Components\Select::make('default_pm')
+                        ->label('Process Manager (pm)')
+                        ->options([
+                            'ondemand' => 'ondemand — avvia worker su richiesta (consigliato)',
+                            'dynamic'  => 'dynamic — pool variabile',
+                            'static'   => 'static — numero fisso di worker',
+                        ])
+                        ->default('ondemand')
+                        ->required(),
+
+                    Forms\Components\TextInput::make('default_pm_max_children')
+                        ->label('pm.max_children')
+                        ->numeric()
+                        ->default(10)
+                        ->minValue(1)
+                        ->required(),
+
+                    Forms\Components\TextInput::make('default_pm_process_idle_timeout')
+                        ->label('pm.process_idle_timeout (s)')
+                        ->numeric()
+                        ->default(10)
+                        ->minValue(1)
+                        ->required()
+                        ->helperText('Solo per ondemand: secondi prima di terminare worker inattivi.'),
+
+                    Forms\Components\TextInput::make('default_pm_max_requests')
+                        ->label('pm.max_requests')
+                        ->numeric()
+                        ->default(0)
+                        ->minValue(0)
+                        ->required()
+                        ->helperText('0 = illimitato. Utile per gestire memory leak.'),
+
+                    Forms\Components\TextInput::make('default_hd_quota')
+                        ->label('Quota disco default (MB)')
+                        ->numeric()
+                        ->default(-1)
+                        ->required()
+                        ->helperText('-1 = illimitato.'),
+
+                ])->columns(2),
+
+            // ── Impostazioni predefinite ──────────────────────────────────────
             Forms\Components\Section::make('Impostazioni predefinite')
                 ->schema([
                     Forms\Components\Select::make('default_php_version_id')
@@ -191,6 +252,11 @@ class ServerResource extends Resource
                         ->helperText('Verrà preselezionata automaticamente durante la creazione di un nuovo sito su questo server.')
                         ->searchable(),
                 ]),
+
+            Forms\Components\Textarea::make('notes')
+                ->label('Note')
+                ->placeholder('Informazioni aggiuntive sul server, versione OS, ecc.')
+                ->columnSpanFull(),
         ]);
     }
 
@@ -212,6 +278,10 @@ class ServerResource extends Resource
                 Tables\Columns\BadgeColumn::make('status')
                     ->label('Stato')
                     ->colors(['success' => 'active', 'danger' => 'error', 'warning' => 'inactive']),
+                Tables\Columns\TextColumn::make('apache_http_port')
+                    ->label('Porta Apache'),
+                Tables\Columns\TextColumn::make('default_pm')
+                    ->label('PM default'),
                 Tables\Columns\TextColumn::make('ispConfigClients_count')
                     ->label('Clienti')
                     ->counts('ispConfigClients'),
@@ -265,7 +335,6 @@ class ServerResource extends Resource
                             $results[] = '✅ WP-CLI: trovato';
                         } catch (\Throwable) {
                             $results[] = '⚠️ WP-CLI: non trovato (necessario per il provisioning)';
-                            // Non blocca — warning ma non fallimento critico
                         }
 
                         Notification::make()

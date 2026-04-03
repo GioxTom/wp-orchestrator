@@ -44,15 +44,25 @@ class Site extends Model
         'status',
         'current_step',
         'ssl_enabled',
+        // PHP-FPM overrides (null = usa default server)
+        'pm',
+        'pm_max_children',
+        'pm_process_idle_timeout',
+        'pm_max_requests',
+        'hd_quota',
     ];
 
     protected $casts = [
-        'db_password'        => 'encrypted',
-        'wp_admin_password'  => 'encrypted',
-        'ssl_enabled'        => 'boolean',
-        'logo_generated_at'  => 'datetime',
-        'auto_categories'    => 'boolean',
-        'categories_count'   => 'integer',
+        'db_password'             => 'encrypted',
+        'wp_admin_password'       => 'encrypted',
+        'ssl_enabled'             => 'boolean',
+        'logo_generated_at'       => 'datetime',
+        'auto_categories'         => 'boolean',
+        'categories_count'        => 'integer',
+        'pm_max_children'         => 'integer',
+        'pm_process_idle_timeout' => 'integer',
+        'pm_max_requests'         => 'integer',
+        'hd_quota'                => 'integer',
     ];
 
     protected $hidden = [
@@ -113,6 +123,33 @@ class Site extends Model
     public function isProvisioning(): bool
     {
         return $this->status === 'provisioning';
+    }
+
+    // ── Valori PHP-FPM effettivi: override sito oppure default server ──────────
+
+    public function effectivePm(): string
+    {
+        return $this->pm ?? $this->server->default_pm ?? 'ondemand';
+    }
+
+    public function effectivePmMaxChildren(): int
+    {
+        return $this->pm_max_children ?? $this->server->default_pm_max_children ?? 10;
+    }
+
+    public function effectivePmProcessIdleTimeout(): int
+    {
+        return $this->pm_process_idle_timeout ?? $this->server->default_pm_process_idle_timeout ?? 10;
+    }
+
+    public function effectivePmMaxRequests(): int
+    {
+        return $this->pm_max_requests ?? $this->server->default_pm_max_requests ?? 0;
+    }
+
+    public function effectiveHdQuota(): int
+    {
+        return $this->hd_quota ?? $this->server->default_hd_quota ?? -1;
     }
 
     /**
