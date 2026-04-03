@@ -46,7 +46,7 @@ class CreateIspConfigDatabaseJob extends BaseProvisioningJob
                 'db_password'     => $dbPassword,
             ]);
 
-            // Attende che ISPConfig propaghi l'utente a MariaDB
+            // Attende 180 secondi che ISPConfig propaghi l'utente a MariaDB
             $this->waitForDbAccess($dbUser, $dbPassword);
 
         } finally {
@@ -56,9 +56,10 @@ class CreateIspConfigDatabaseJob extends BaseProvisioningJob
 
     /**
      * Attende che ISPConfig propaghi l'utente DB a MariaDB.
-     * ISPConfig usa un job queue interno — ci vogliono alcuni secondi.
+     * ISPConfig usa un job queue interno — può impiegare fino a 60 secondi.
+     * Timeout totale: 36 tentativi × 5s = 180 secondi.
      */
-    private function waitForDbAccess(string $dbUser, string $dbPassword, int $maxAttempts = 12): void
+    private function waitForDbAccess(string $dbUser, string $dbPassword, int $maxAttempts = 36): void
     {
         for ($i = 0; $i < $maxAttempts; $i++) {
             try {

@@ -132,7 +132,7 @@ class CreateIspConfigDomainJob extends BaseProvisioningJob
                 return;
             }
 
-            sleep(2);
+            sleep(3);
             $attempts++;
         }
 
