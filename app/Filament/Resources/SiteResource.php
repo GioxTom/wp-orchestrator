@@ -43,13 +43,13 @@ class SiteResource extends Resource
                         ->required()
                         ->live()
                         ->afterStateUpdated(function ($state, Forms\Set $set) {
-                            $set('ispconfig_client_id', null);
-                            // Precompila la versione PHP con il default del server
                             if ($state) {
                                 $server = Server::find($state);
                                 $set('php_version_id', $server?->default_php_version_id);
+                                $set('ispconfig_client_id', IspConfigClient::getDefault($state)?->id);
                             } else {
                                 $set('php_version_id', null);
+                                $set('ispconfig_client_id', null);
                             }
                         }),
 
@@ -58,9 +58,7 @@ class SiteResource extends Resource
                         ->options(fn ($get) => IspConfigClient::where('server_id', $get('server_id'))
                             ->get()
                             ->pluck('display_name', 'id'))
-                        ->default(fn ($get) => IspConfigClient::getDefault(
-                            $get('server_id') ?? \App\Models\Server::where('status', 'active')->value('id')
-                        )?->id)
+                        ->placeholder('Seleziona il cliente')
                         ->required()
                         ->searchable()
                         ->disabled(fn ($get) => ! $get('server_id')),
@@ -69,6 +67,7 @@ class SiteResource extends Resource
                         ->label('Versione PHP')
                         ->options(fn ($get) => IspConfigPhpVersion::where('server_id', $get('server_id'))
                             ->pluck('label', 'id'))
+                        ->placeholder('Seleziona la versione')
                         ->required()
                         ->disabled(fn ($get) => ! $get('server_id')),
 
