@@ -124,13 +124,22 @@ class CreateIspConfigDomainJob extends BaseProvisioningJob
         $docroot  = $this->resolveDocroot($domain);
         $attempts = 0;
 
-        while (! is_dir($docroot) && $attempts < 15) {
+        while ($attempts < 60) {
+            $docroot = $this->resolveDocroot($domain);
+
+            // Se resolveDocroot ha trovato la cartella reale (non il fallback), ok
+            if (is_dir($docroot)) {
+                return;
+            }
+
             sleep(2);
             $attempts++;
         }
 
+        // Ultimo tentativo con il path risolvibile in questo momento
+        $docroot = $this->resolveDocroot($domain);
         if (! is_dir($docroot)) {
-            throw new \RuntimeException("Docroot {$docroot} non creato da ISPConfig dopo 30 secondi");
+            throw new \RuntimeException("Docroot per {$domain} non creato da ISPConfig dopo 60 secondi");
         }
     }
 
